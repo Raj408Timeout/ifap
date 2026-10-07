@@ -46,6 +46,44 @@ Flip it at runtime (no restart) with the toggle in the UI header, or with
 `curl -X PUT localhost:8000/api/v1/llm -H 'content-type: application/json' -d '{"enabled": false}'`.
 The switch applies to the whole API process and resets to `IFAP_LLM__ENABLED` on restart.
 
+## Workflows: standard and autonomous
+`IFAP_WORKFLOW__WORKFLOWS` defines named agent graphs. Each workflow lists its `steps`, plus
+`routes` that map an agent's *signal* to a next step, which is how loops are configured.
+
+| Workflow | Steps | Behaviour |
+|---|---|---|
+| `standard` (default) | intent → template_retrieval → questionnaire_builder → validation | Fixed pipeline; one LLM call per LLM-backed agent |
+| `autonomous` | intent → template_retrieval → **autonomous_builder** → validation ↺ | The builder runs a **tool loop** (`search_templates`, `submit_draft`), reads validation feedback and revises until accepted. Validation's `invalid`/`incomplete` signals route back to the builder (capped at 2 visits). Guardrails: `IFAP_WORKFLOW__AUTONOMOUS_MAX_TOOL_CALLS` (8) and `..._MAX_SECONDS` (600). |
+
+Choose a workflow per request: `{"message": "...", "workflow": "autonomous"}`, or with the
+picker in the UI header.
+
+## MCP server (Claude Desktop, Claude Code)
+IFAP is also an MCP server. It's a second way in, next to the REST API, using the same services.
+
+| Tool | Purpose |
+|---|---|
+| `get_platform_status` | Workflows, agents, LLM state, knowledge size |
+| `list_survey_types` / `search_templates` | Explore the template knowledge base (RAG) |
+| `generate_questionnaire` | Run IFAP's agents (`workflow`: `standard` or `autonomous`). Waits up to 40 s (`IFAP_MCP__WAIT_SECONDS`); longer runs return a `job_id` |
+| `get_generation_result` | Poll a running job: status, agent steps finished so far, and the result |
+| `build_questionnaire_from_templates` | Claude acts as the builder: pick template ids, get validation feedback |
+| `get_questionnaire` / `list_questionnaires` / `publish_questionnaire` | Review and manage |
+| `set_llm_enabled` | Switch IFAP's own LLM strategies on/off (this process only) |
+
+**Claude Desktop:** add this to `~/Library/Application Support/Claude/claude_desktop_config.json`,
+then quit and reopen Claude Desktop (Cmd+Q):
+```json
+{ "mcpServers": { "ifap": {
+    "command": "/ABSOLUTE/PATH/survey_and_analytics/backend/.venv/bin/ifap-mcp", "args": [] } } }
+```
+**Claude Code:** `claude mcp add ifap -- /ABSOLUTE/PATH/backend/.venv/bin/ifap-mcp`
+**HTTP transport** (remote clients): `ifap-mcp --transport http --port 8100` serves `/mcp`.
+
+The MCP process reads `backend/.env` (so Ollama works), keeps its knowledge base in memory, logs
+to stderr, and shares the SQLite database with the API: questionnaires created in Claude
+Desktop show up in the API too.
+
 ## Quality gate
 `make check` runs black, ruff, pylint, pyright (strict), and the unit, integration and
 architecture tests. CI runs the same steps.
@@ -78,4 +116,4 @@ class SentimentAgent(BaseAgent):
     async def _execute(self, state: WorkflowState) -> AgentOutcome: ...
 ```
 Then register its module (`IFAP_WORKFLOW__PLUGIN_MODULES` or an `ifap.agents` entry point) and
-add `"sentiment"` to `IFAP_WORKFLOW__PIPELINE`.
+add `"sentiment"` to a workflow's `steps` in `IFAP_WORKFLOW__WORKFLOWS`.

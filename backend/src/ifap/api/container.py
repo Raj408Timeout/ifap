@@ -32,17 +32,18 @@ from ifap.agents.framework import (
     AgentRegistry,
     load_plugins,
 )
+from ifap.application.jobs import GenerationJobService
 from ifap.application.llm_switch import SwitchableLLMClient
 from ifap.application.ports import (
     EmbeddingProvider,
     KnowledgeProvider,
     LLMControl,
-    QuestionnaireGenerator,
     TemplateSource,
     WorkflowOrchestrator,
 )
 from ifap.application.services import (
     KnowledgeIngestionService,
+    QuestionnaireAssemblyService,
     QuestionnaireGenerationService,
     QuestionnaireService,
 )
@@ -51,18 +52,21 @@ from ifap.config.settings import (
     KnowledgeProviderKind,
     Settings,
 )
+from ifap.domain.intent import IntentTaxonomy
 from ifap.orchestration.langgraph_orchestrator import LangGraphWorkflowOrchestrator
 
 
 @dataclass(frozen=True, slots=True)
-class Container:
+class Container:  # pylint: disable=too-many-instance-attributes  # composition root: one field per service
     settings: Settings
     engine: AsyncEngine
     knowledge: KnowledgeProvider
     template_source: TemplateSource
-    orchestrator: WorkflowOrchestrator
-    generator: QuestionnaireGenerator
+    taxonomy: IntentTaxonomy
+    generator: QuestionnaireGenerationService
+    jobs: GenerationJobService
     questionnaires: QuestionnaireService
+    assembly: QuestionnaireAssemblyService
     ingestion: KnowledgeIngestionService
     agent_descriptors: tuple[AgentDescriptor, ...]
     llm: LLMControl
@@ -96,12 +100,20 @@ def build_knowledge(settings: Settings, embeddings: EmbeddingProvider) -> Knowle
     )
 
 
-def build_orchestrator(
+def build_orchestrators(
     settings: Settings, deps: AgentDependencies, registry: AgentRegistry
-) -> WorkflowOrchestrator:
+) -> dict[str, WorkflowOrchestrator]:
+    """One compiled LangGraph per named workflow in configuration."""
     load_plugins(settings.workflow.plugin_modules)
-    agents = [registry.create(name, deps) for name in settings.workflow.pipeline]
-    return LangGraphWorkflowOrchestrator(agents)
+    return {
+        name: LangGraphWorkflowOrchestrator(
+            [registry.create(step, deps) for step in definition.steps],
+            name=name,
+            routes=definition.routes,
+            max_visits=definition.max_visits_per_step,
+        )
+        for name, definition in settings.workflow.workflows.items()
+    }
 
 
 async def build_container(
@@ -113,23 +125,29 @@ async def build_container(
     repository = SqlAlchemyQuestionnaireRepository(engine)
     llm = build_llm(settings)
     knowledge = build_knowledge(settings, build_embeddings(settings))
+    taxonomy = load_taxonomy(settings.workflow.taxonomy_path)
     deps = AgentDependencies(
-        llm=llm,
-        knowledge=knowledge,
-        workflow=settings.workflow,
-        taxonomy=load_taxonomy(settings.workflow.taxonomy_path),
+        llm=llm, knowledge=knowledge, workflow=settings.workflow, taxonomy=taxonomy
     )
-    orchestrator = build_orchestrator(settings, deps, registry)
+    orchestrators = build_orchestrators(settings, deps, registry)
+    generator = QuestionnaireGenerationService(
+        orchestrators=orchestrators,
+        default_workflow=settings.workflow.default_workflow,
+        repository=repository,
+        events=events,
+    )
     return Container(
         settings=settings,
         engine=engine,
         knowledge=knowledge,
         template_source=JsonTemplateSource(settings.knowledge.dataset_path),
-        orchestrator=orchestrator,
-        generator=QuestionnaireGenerationService(
-            orchestrator=orchestrator, repository=repository, events=events
-        ),
+        taxonomy=taxonomy,
+        generator=generator,
+        jobs=GenerationJobService(generator, max_jobs=settings.mcp.max_jobs),
         questionnaires=QuestionnaireService(repository=repository, events=events),
+        assembly=QuestionnaireAssemblyService(
+            knowledge=knowledge, repository=repository, events=events
+        ),
         ingestion=KnowledgeIngestionService(
             knowledge=knowledge, events=events, batch_size=settings.knowledge.ingest_batch_size
         ),

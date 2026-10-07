@@ -1,6 +1,7 @@
 """Architecture fitness functions: enforce hexagonal dependency rules on every CI run.
 
-Rule: dependencies point inward. domain <- application <- agents/orchestration <- adapters <- api
+Rule: dependencies point inward.
+domain <- application <- agents/orchestration <- adapters <- api / mcp_server (driving adapters)
 """
 
 from __future__ import annotations
@@ -21,13 +22,15 @@ FORBIDDEN: dict[str, set[str]] = {
         "orchestration",
         "adapters",
         "api",
+        "mcp_server",
         "config",
         "observability",
     },
-    "application": {"agents", "orchestration", "adapters", "api"},
-    "agents": {"orchestration", "adapters", "api"},
-    "orchestration": {"adapters", "api"},
-    "adapters": {"agents", "orchestration", "api"},
+    "application": {"agents", "orchestration", "adapters", "api", "mcp_server"},
+    "agents": {"orchestration", "adapters", "api", "mcp_server"},
+    "orchestration": {"adapters", "api", "mcp_server"},
+    "adapters": {"agents", "orchestration", "api", "mcp_server"},
+    "api": {"mcp_server"},
 }
 
 # Domain may only depend on the standard library and Pydantic.
@@ -74,7 +77,7 @@ def test_domain_is_framework_free() -> None:
 
 
 def test_only_composition_root_wires_adapters() -> None:
-    api_files = [p for p in _modules("api") if p.name != "container.py"]
+    api_files = [p for p in [*_modules("api"), *_modules("mcp_server")] if p.name != "container.py"]
     violations = [
         f"{path.name} imports {name}"
         for path in api_files

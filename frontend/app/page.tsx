@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ChatPanel, type ChatMessage } from "@/components/ChatPanel";
 import { LlmToggle } from "@/components/LlmToggle";
 import { QuestionnaireEditor } from "@/components/QuestionnaireEditor";
+import { WorkflowPicker } from "@/components/WorkflowPicker";
 import { api, ApiError } from "@/lib/api";
 import type { AgentTrace, GenerateResponse, Questionnaire, ValidationSummary } from "@/lib/types";
 
@@ -18,7 +19,7 @@ function summarise(result: GenerateResponse): string {
   const { intent, questionnaire, source_count: sources } = result;
   const confidence = Math.round(intent.confidence * 100);
   return [
-    `I understood this as a ${intent.survey_type.replaceAll("_", " ")} (${confidence}% confidence).`,
+    `I understood this as a ${intent.survey_type.replaceAll("_", " ")} (${confidence}% confidence) and ran the "${result.workflow}" workflow.`,
     `Retrieved ${sources} candidate templates and built "${questionnaire.title}" with ${questionnaire.questions.length} questions.`,
     "Review it on the right - edit, reorder or remove questions, then save and publish.",
   ].join("\n");
@@ -31,6 +32,8 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [busy, setBusy] = useState(false);
+  const [workflow, setWorkflow] = useState<string | null>(null);
+  const chooseWorkflow = useCallback((name: string) => setWorkflow(name), []);
 
   const say = (message: ChatMessage) => setMessages((current) => [...current, message]);
 
@@ -48,7 +51,7 @@ export default function Home() {
   const generate = (text: string) => {
     say({ role: "user", text });
     void run(async () => {
-      const result = await api.generate(text);
+      const result = await api.generate(text, workflow ?? undefined);
       setWorkspace({ ...result, dirty: false });
       say({ role: "assistant", text: summarise(result) });
     });
@@ -80,7 +83,10 @@ export default function Home() {
             Intent → Template Retrieval (RAG) → Questionnaire Builder → Validation
           </p>
         </div>
-        <LlmToggle />
+        <div className="flex flex-wrap items-center gap-2">
+          <WorkflowPicker value={workflow} onChange={chooseWorkflow} />
+          <LlmToggle />
+        </div>
       </header>
       <div className="grid flex-1 gap-4 lg:grid-cols-[380px_1fr]">
         <div className="h-[75vh] lg:sticky lg:top-6">

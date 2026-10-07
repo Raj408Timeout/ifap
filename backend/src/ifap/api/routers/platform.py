@@ -50,7 +50,8 @@ async def ingest_knowledge(container: ContainerDep) -> IngestionResponse:
 @router.get("/agents", response_model=AgentsResponse)
 async def list_agents(container: ContainerDep) -> AgentsResponse:
     return AgentsResponse(
-        pipeline=container.orchestrator.pipeline,
+        workflows=container.generator.workflows,
+        default_workflow=container.generator.default_workflow,
         llm_enabled=container.llm.status().enabled,
         agents=list(container.agent_descriptors),
     )

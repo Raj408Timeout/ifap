@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from ifap.domain.questionnaire import Questionnaire
+from ifap.domain.questionnaire import Question, Questionnaire
 
 
 class Severity(StrEnum):
@@ -104,3 +104,30 @@ def validate_questionnaire(
 ) -> ValidationReport:
     issues = [issue for rule in rules for issue in rule(questionnaire)]
     return ValidationReport(issues=tuple(issues))
+
+
+def repair_questionnaire(questionnaire: Questionnaire) -> tuple[Questionnaire, int]:
+    """Safe, deterministic fixes: drop duplicate questions and skip-logic rules that point at
+    unknown or later questions. Returns the repaired questionnaire and the number of repairs."""
+    seen_ids: set[str] = set()
+    seen_labels: set[str] = set()
+    kept: list[Question] = []
+    repairs = 0
+    for question in questionnaire.questions:
+        label_key = question.label.strip().lower()
+        if question.id in seen_ids or label_key in seen_labels:
+            repairs += 1
+            continue
+        cleaned = _drop_dangling_rules(question, seen_ids)
+        repairs += int(cleaned is not question)
+        kept.append(cleaned)
+        seen_ids.add(question.id)
+        seen_labels.add(label_key)
+    return questionnaire.model_copy(update={"questions": tuple(kept)}), repairs
+
+
+def _drop_dangling_rules(question: Question, earlier_ids: set[str]) -> Question:
+    valid = tuple(rule for rule in question.dependency_rules if rule.depends_on in earlier_ids)
+    if len(valid) == len(question.dependency_rules):
+        return question
+    return question.model_copy(update={"dependency_rules": valid})

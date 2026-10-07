@@ -23,7 +23,11 @@ dependencies = [
     "opentelemetry-api>=1.28",
     "opentelemetry-sdk>=1.28",
     "opentelemetry-instrumentation-fastapi>=0.49b0",
+    "mcp>=2.3",
 ]
+
+[project.scripts]
+ifap-mcp = "ifap.mcp_server.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -118,6 +122,7 @@ branch = true
 # Only genuinely untestable code is omitted - never add a file here to "fix" coverage.
 omit = [
     "src/ifap/main.py",  # 2-line ASGI entry point (`app = create_app()`), exercised by `make api`
+    "src/ifap/mcp_server/__main__.py",  # 2-line `python -m` entry point; logic is in cli.py
 ]
 
 [tool.coverage.report]

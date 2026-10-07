@@ -11,10 +11,11 @@ def _orchestrator(deps: AgentDependencies, pipeline: list[str]) -> LangGraphWork
 
 
 async def test_full_pipeline_produces_valid_questionnaire(deps: AgentDependencies) -> None:
-    orchestrator = _orchestrator(deps, deps.workflow.pipeline)
+    steps = deps.workflow.workflows["standard"].steps
+    orchestrator = _orchestrator(deps, steps)
     request = GenerationRequest(message="Patient intake form covering allergies and medication")
     state = await orchestrator.run(WorkflowState(request=request))
-    assert [t.agent for t in state.trace] == deps.workflow.pipeline
+    assert [t.agent for t in state.trace] == steps
     assert state.questionnaire is not None
     assert state.validation is not None
     assert state.validation.is_valid

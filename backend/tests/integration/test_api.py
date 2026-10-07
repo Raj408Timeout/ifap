@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ifap.api.app import create_app
-from ifap.config.settings import KnowledgeProviderKind, LLMProviderKind, LLMSettings, Settings
+from ifap.config.settings import (
+    KnowledgeProviderKind,
+    LLMProviderKind,
+    LLMSettings,
+    Settings,
+    WorkflowDefinition,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -83,7 +89,9 @@ def test_knowledge_search_with_metadata_filter(client: TestClient) -> None:
 
 def test_agents_catalogue(client: TestClient) -> None:
     body = client.get("/api/v1/agents").json()
-    assert body["pipeline"][0] == "intent"
+    assert body["default_workflow"] == "standard"
+    assert body["workflows"]["standard"][0] == "intent"
+    assert "autonomous_builder" in body["workflows"]["autonomous"]
     assert body["llm_enabled"] is False
 
 
@@ -130,7 +138,8 @@ def test_list_and_reingest(client: TestClient) -> None:
 
 
 def test_broken_pipeline_returns_502(app_settings: Settings) -> None:
-    workflow = app_settings.workflow.model_copy(update={"pipeline": ["intent", "validation"]})
+    broken = WorkflowDefinition(steps=["intent", "validation"])
+    workflow = app_settings.workflow.model_copy(update={"workflows": {"standard": broken}})
     with TestClient(create_app(app_settings.model_copy(update={"workflow": workflow}))) as client:
         response = client.post("/api/v1/questionnaires/generate", json={"message": "a survey"})
     assert response.status_code == 502

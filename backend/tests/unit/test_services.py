@@ -49,7 +49,8 @@ def _service(deps: AgentDependencies, pipeline: list[str]) -> QuestionnaireGener
         [DEFAULT_REGISTRY.create(n, deps) for n in pipeline]
     )
     return QuestionnaireGenerationService(
-        orchestrator=orchestrator,
+        orchestrators={"standard": orchestrator},
+        default_workflow="standard",
         repository=_UnusedRepository(),
         events=InMemoryEventBus(),
     )

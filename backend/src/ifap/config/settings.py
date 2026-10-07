@@ -1,7 +1,7 @@
 """Typed, environment-driven configuration. Every tunable lives here - no magic values in code.
 
 Environment variables use the `IFAP_` prefix and `__` for nesting, e.g.
-`IFAP_LLM__API_KEY`, `IFAP_KNOWLEDGE__PROVIDER=chroma`, `IFAP_WORKFLOW__PIPELINE='["intent"]'`.
+`IFAP_LLM__PROVIDER=ollama`, `IFAP_WORKFLOW__DEFAULT_WORKFLOW=autonomous`.
 """
 
 from __future__ import annotations
@@ -10,8 +10,9 @@ from collections.abc import Mapping
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -124,8 +125,44 @@ class KnowledgeSettings(BaseModel):
     ingest_batch_size: int = Field(default=64, ge=1)
 
 
+class WorkflowDefinition(BaseModel):
+    """A named agent graph.
+
+    `steps` run in order. `routes` maps an agent's emitted *signal* to the step to run next,
+    e.g. `{"validation": {"incomplete": "autonomous_builder"}}` - this is how loops and
+    agent-decided routing are configured without code. `max_visits_per_step` caps every loop.
+    """
+
+    steps: list[str] = Field(min_length=1)
+    routes: dict[str, dict[str, str]] = {}
+    max_visits_per_step: int = Field(default=3, ge=1)
+
+    @model_validator(mode="after")
+    def _routes_reference_steps(self) -> Self:
+        known = set(self.steps)
+        for source, signals in self.routes.items():
+            unknown = {source, *signals.values()} - known
+            if unknown:
+                raise ValueError(f"routes reference unknown steps: {sorted(unknown)}")
+        return self
+
+
+STANDARD_WORKFLOW = WorkflowDefinition(
+    steps=["intent", "template_retrieval", "questionnaire_builder", "validation"]
+)
+AUTONOMOUS_WORKFLOW = WorkflowDefinition(
+    steps=["intent", "template_retrieval", "autonomous_builder", "validation"],
+    routes={"validation": {"invalid": "autonomous_builder", "incomplete": "autonomous_builder"}},
+    max_visits_per_step=2,
+)
+
+
 class WorkflowSettings(BaseModel):
-    pipeline: list[str] = ["intent", "template_retrieval", "questionnaire_builder", "validation"]
+    workflows: dict[str, WorkflowDefinition] = {
+        "standard": STANDARD_WORKFLOW,
+        "autonomous": AUTONOMOUS_WORKFLOW,
+    }
+    default_workflow: str = "standard"
     plugin_modules: list[str] = ["ifap.agents.builtin"]
     taxonomy_path: Path = BACKEND_ROOT / "data" / "intent_taxonomy.json"
     retrieval_top_k: int = Field(default=40, ge=1, le=200)
@@ -136,6 +173,15 @@ class WorkflowSettings(BaseModel):
     max_question_count: int = Field(default=50, ge=1, le=100)
     agent_max_attempts: int = Field(default=2, ge=1)
     agent_retry_backoff_seconds: float = Field(default=0.2, ge=0.0)
+    # Guardrails for tool-calling (autonomous) agents
+    autonomous_max_tool_calls: int = Field(default=8, ge=1)
+    autonomous_max_seconds: float = Field(default=600.0, gt=0)
+
+    @model_validator(mode="after")
+    def _default_workflow_exists(self) -> Self:
+        if self.default_workflow not in self.workflows:
+            raise ValueError(f"default_workflow '{self.default_workflow}' is not defined")
+        return self
 
 
 class DatabaseSettings(BaseModel):
@@ -147,8 +193,17 @@ class ObservabilitySettings(BaseModel):
     service_name: str = "ifap-api"
     log_level: str = "INFO"
     log_json: bool = True
+    # stdio MCP servers must keep stdout for the protocol, so they log to stderr
+    log_stream: Literal["stdout", "stderr"] = "stdout"
     otlp_endpoint: str | None = None
     console_traces: bool = False
+
+
+class McpSettings(BaseModel):
+    # Stay under the host's tool timeout (Claude Desktop gives up after ~60 s): a tool call
+    # waits at most this long, then returns a job id to poll with get_generation_result.
+    wait_seconds: float = Field(default=40.0, gt=0)
+    max_jobs: int = Field(default=50, ge=1)
 
 
 class ApiSettings(BaseModel):
@@ -162,12 +217,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="IFAP_",
         env_nested_delimiter="__",
-        env_file=".env",
+        # backend/.env is found regardless of the working directory (e.g. when Claude Desktop
+        # launches the MCP server); a .env in the current directory overrides it.
+        env_file=(BACKEND_ROOT / ".env", ".env"),
         extra="ignore",
     )
 
     environment: str = "local"
     api: ApiSettings = ApiSettings()
+    mcp: McpSettings = McpSettings()
     llm: LLMSettings = LLMSettings()
     embedding: EmbeddingSettings = EmbeddingSettings()
     knowledge: KnowledgeSettings = KnowledgeSettings()

@@ -8,7 +8,7 @@ from ifap.adapters.knowledge.in_memory_provider import InMemoryKnowledgeProvider
 from ifap.agents.builtin.builder_agent import QuestionnaireBuilderAgent, select_diverse
 from ifap.agents.builtin.intent_agent import IntentAgent
 from ifap.agents.builtin.retrieval_agent import TemplateRetrievalAgent
-from ifap.agents.builtin.validation_agent import ValidationAgent, repair
+from ifap.agents.builtin.validation_agent import ValidationAgent
 from ifap.agents.framework import (
     AgentDependencies,
     AgentDescriptor,
@@ -21,7 +21,7 @@ from ifap.application.workflow import AgentStatus, GenerationRequest, WorkflowSt
 from ifap.domain.errors import AgentNotRegisteredError
 from ifap.domain.knowledge import KnowledgeQuery
 from ifap.domain.questionnaire import AnswerType, DependencyRule, Question, Questionnaire
-from ifap.domain.validation import validate_questionnaire
+from ifap.domain.validation import repair_questionnaire, validate_questionnaire
 
 
 def _state(message: str, **kwargs: int | str) -> WorkflowState:
@@ -98,7 +98,7 @@ def test_validation_repair_removes_dangling_rules_and_duplicates() -> None:
     )
     base = Question(id="q1", label="Base?", category="c", answer_type=AnswerType.BOOLEAN)
     questionnaire = Questionnaire(title="Test", survey_type="x", questions=(base, orphan, base))
-    repaired, repairs = repair(questionnaire)
+    repaired, repairs = repair_questionnaire(questionnaire)
     assert repairs == 2
     assert repaired.question_ids() == ["q1", "q2"]
     assert repaired.questions[1].dependency_rules == ()

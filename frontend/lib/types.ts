@@ -89,11 +89,18 @@ export interface GenerateResponse {
   validation: ValidationSummary;
   trace: AgentTrace[];
   source_count: number;
+  workflow: string;
 }
 
 export interface ReviseResponse {
   questionnaire: Questionnaire;
   validation: ValidationSummary;
+}
+
+export interface AgentsInfo {
+  workflows: Record<string, string[]>;
+  default_workflow: string;
+  llm_enabled: boolean;
 }
 
 export interface LLMStatus {

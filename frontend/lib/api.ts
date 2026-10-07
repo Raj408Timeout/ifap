@@ -1,4 +1,5 @@
 import type {
+  AgentsInfo,
   GenerateResponse,
   LLMStatus,
   Question,
@@ -32,11 +33,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  generate: (message: string, questionCount?: number) =>
+  generate: (message: string, workflow?: string) =>
     request<GenerateResponse>("/questionnaires/generate", {
       method: "POST",
-      body: JSON.stringify({ message, question_count: questionCount ?? null }),
+      body: JSON.stringify({ message, workflow: workflow ?? null }),
     }),
+
+  agents: () => request<AgentsInfo>("/agents"),
 
   revise: (id: string, title: string, description: string, questions: Question[]) =>
     request<ReviseResponse>(`/questionnaires/${id}`, {

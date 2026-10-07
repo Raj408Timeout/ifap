@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import structlog
 
@@ -24,6 +25,11 @@ def configure_logging(settings: ObservabilitySettings) -> None:
             renderer,
         ],
         wrapper_class=structlog.make_filtering_bound_logger(level),
+        # Default factory resolves sys.stdout per logger (safe when stdout is swapped);
+        # stderr is pinned for stdio MCP servers, whose stdout carries the protocol.
+        logger_factory=structlog.PrintLoggerFactory(
+            sys.stderr if settings.log_stream == "stderr" else None
+        ),
     )
 
 

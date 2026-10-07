@@ -73,6 +73,18 @@ class ChromaKnowledgeProvider:
             for metadata, distance in zip(metadatas, distances, strict=True)
         ]
 
+    async def get(self, template_ids: Sequence[str]) -> list[QuestionTemplate]:
+        if not template_ids:
+            return []
+        result = await asyncio.to_thread(
+            self._collection.get, ids=list(template_ids), include=cast(Any, ["metadatas"])
+        )
+        found = {
+            tid: QuestionTemplate.model_validate_json(str(metadata[PAYLOAD_KEY]))
+            for tid, metadata in zip(result["ids"], result.get("metadatas") or [], strict=True)
+        }
+        return [found[tid] for tid in template_ids if tid in found]
+
     async def count(self) -> int:
         return await asyncio.to_thread(self._collection.count)
 

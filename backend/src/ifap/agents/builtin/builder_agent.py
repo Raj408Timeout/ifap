@@ -114,33 +114,49 @@ class QuestionnaireBuilderAgent(BaseAgent):
         if len(chosen) < max(1, intent.question_count // 2):
             raise LLMUnavailableError("LLM plan was not grounded in the candidates")
         rewrites = {r.id: r.label for r in plan.rewrites if r.id in by_id}
-        questions = tuple(_apply_rewrite(c.template.question, rewrites) for c in _ordered(chosen))
+        questions = tuple(
+            _apply_rewrite(c.template.question, rewrites) for c in order_by_template(chosen)
+        )
         return self._questionnaire(intent, questions, chosen, plan.title, plan.description)
 
     def _build_heuristically(
         self, intent: BusinessIntent, candidates: Sequence[RetrievedTemplate]
     ) -> Questionnaire:
         chosen = select_diverse(candidates, intent.question_count)
-        profile = self._taxonomy.profile(intent.survey_type)
-        title = profile.title if profile else intent.survey_type.replace("_", " ").title()
-        questions = tuple(c.template.question for c in _ordered(chosen))
+        title = default_title(intent, self._taxonomy)
+        questions = tuple(c.template.question for c in order_by_template(chosen))
         return self._questionnaire(intent, questions, chosen, title, intent.raw_request)
 
-    @staticmethod
     def _questionnaire(
+        self,
         intent: BusinessIntent,
         questions: tuple[Question, ...],
         chosen: Sequence[RetrievedTemplate],
         title: str,
         description: str,
     ) -> Questionnaire:
-        return Questionnaire(
-            title=title,
-            description=description,
-            survey_type=intent.survey_type,
-            questions=questions,
-            source_template_ids=tuple(c.template.template_id for c in chosen),
-        )
+        return assemble_questionnaire(intent, questions, chosen, title, description)
+
+
+def default_title(intent: BusinessIntent, taxonomy: IntentTaxonomy) -> str:
+    profile = taxonomy.profile(intent.survey_type)
+    return profile.title if profile else intent.survey_type.replace("_", " ").title()
+
+
+def assemble_questionnaire(
+    intent: BusinessIntent,
+    questions: tuple[Question, ...],
+    chosen: Sequence[RetrievedTemplate],
+    title: str,
+    description: str,
+) -> Questionnaire:
+    return Questionnaire(
+        title=title,
+        description=description,
+        survey_type=intent.survey_type,
+        questions=questions,
+        source_template_ids=tuple(c.template.template_id for c in chosen),
+    )
 
 
 def select_diverse(candidates: Sequence[RetrievedTemplate], count: int) -> list[RetrievedTemplate]:
@@ -185,7 +201,7 @@ def _select_with_parents(
     selected[question.id] = candidate
 
 
-def _ordered(chosen: Sequence[RetrievedTemplate]) -> list[RetrievedTemplate]:
+def order_by_template(chosen: Sequence[RetrievedTemplate]) -> list[RetrievedTemplate]:
     """Template order keeps skip-logic parents before their dependants."""
     return sorted(chosen, key=lambda c: c.template.template_id)
 

@@ -50,4 +50,4 @@ flowchart LR
 - DB schema is `create_all` in Phase 1, moving to Alembic migrations run as a pre-deploy job.
 - Ingestion is idempotent (upsert by `template_id`) and runs on startup if empty, or on demand.
 - Rollback is the previous image tag. Agent versions are selected per environment through
-  `IFAP_WORKFLOW__PIPELINE`.
+  `IFAP_WORKFLOW__WORKFLOWS`.

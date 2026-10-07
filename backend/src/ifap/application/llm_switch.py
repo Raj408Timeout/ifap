@@ -10,9 +10,18 @@ The switch is process-local and not persisted: a restart resets it to `IFAP_LLM_
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from pydantic import BaseModel
 
-from ifap.application.ports import LLMClient, LLMStatus, LLMUnavailableError
+from ifap.application.ports import (
+    AssistantTurn,
+    ChatMessage,
+    LLMClient,
+    LLMStatus,
+    LLMUnavailableError,
+    ToolSpec,
+)
 from ifap.domain.errors import DomainRuleViolationError
 
 
@@ -48,10 +57,17 @@ class SwitchableLLMClient:
     async def generate_structured[T: BaseModel](
         self, *, system: str, user: str, output_type: type[T]
     ) -> T:
+        inner = self._active()
+        return await inner.generate_structured(system=system, user=user, output_type=output_type)
+
+    async def converse(
+        self, *, system: str, messages: Sequence[ChatMessage], tools: Sequence[ToolSpec]
+    ) -> AssistantTurn:
+        return await self._active().converse(system=system, messages=messages, tools=tools)
+
+    def _active(self) -> LLMClient:
         if self._inner is None:
             raise LLMUnavailableError("no LLM provider configured")
         if not self._enabled:
             raise LLMUnavailableError("LLM switched off")
-        return await self._inner.generate_structured(
-            system=system, user=user, output_type=output_type
-        )
+        return self._inner

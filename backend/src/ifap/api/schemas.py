@@ -3,7 +3,7 @@ independently; domain value objects are embedded where their shape *is* the cont
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from ifap.agents.framework import AgentDescriptor
 from ifap.application.workflow import AgentTrace, GenerationOutcome
@@ -25,6 +25,7 @@ class GenerateQuestionnaireRequest(_Schema):
     )
     question_count: int | None = Field(default=None, ge=1, le=100)
     survey_type: str | None = None
+    workflow: str | None = Field(default=None, examples=["standard", "autonomous"])
 
 
 class ValidationSummary(_Schema):
@@ -42,6 +43,8 @@ class GenerateQuestionnaireResponse(_Schema):
     validation: ValidationSummary
     trace: list[AgentTrace]
     source_count: int
+    workflow: str
+    artifacts: dict[str, SerializeAsAny[BaseModel]]
 
     @classmethod
     def from_outcome(cls, outcome: GenerationOutcome) -> GenerateQuestionnaireResponse:
@@ -51,6 +54,8 @@ class GenerateQuestionnaireResponse(_Schema):
             validation=ValidationSummary.from_report(outcome.validation),
             trace=list(outcome.trace),
             source_count=outcome.source_count,
+            workflow=outcome.workflow,
+            artifacts=dict(outcome.artifacts),
         )
 
 
@@ -79,7 +84,8 @@ class SetLLMRequest(_Schema):
 
 
 class AgentsResponse(_Schema):
-    pipeline: list[str]
+    workflows: dict[str, list[str]]
+    default_workflow: str
     llm_enabled: bool
     agents: list[AgentDescriptor]
 

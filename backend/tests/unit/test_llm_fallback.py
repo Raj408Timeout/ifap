@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from pydantic import BaseModel
 
 from ifap.agents.builtin.builder_agent import BuilderPlan, LabelRewrite, QuestionnaireBuilderAgent
 from ifap.agents.builtin.intent_agent import IntentAgent, IntentExtraction
@@ -22,28 +21,7 @@ from ifap.config.settings import (
     unrecognised_env_vars,
 )
 from ifap.domain.errors import DomainRuleViolationError
-
-
-class ScriptedLLM:
-    """Fake LLM returning a canned response per output type (missing type => unavailable)."""
-
-    def __init__(self, *responses: BaseModel) -> None:
-        self._responses = {type(response): response for response in responses}
-        self.calls = 0
-
-    @property
-    def enabled(self) -> bool:
-        return True
-
-    async def generate_structured[T: BaseModel](
-        self, *, system: str, user: str, output_type: type[T]
-    ) -> T:
-        del system, user
-        self.calls += 1
-        response = self._responses.get(output_type)
-        if not isinstance(response, output_type):
-            raise LLMUnavailableError(f"no scripted {output_type.__name__}")
-        return response
+from tests.fakes import ScriptedLLM
 
 
 def _switch(inner: ScriptedLLM | None, *, enabled: bool = True) -> SwitchableLLMClient:

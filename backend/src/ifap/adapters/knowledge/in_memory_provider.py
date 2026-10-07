@@ -32,6 +32,9 @@ class InMemoryKnowledgeProvider:
         scored.sort(key=lambda item: item.score, reverse=True)
         return scored[: query.top_k]
 
+    async def get(self, template_ids: Sequence[str]) -> list[QuestionTemplate]:
+        return [self._items[tid][0] for tid in template_ids if tid in self._items]
+
     async def count(self) -> int:
         return len(self._items)
 

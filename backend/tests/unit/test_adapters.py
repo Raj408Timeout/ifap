@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 
 import pytest
+from langchain_core.messages import AIMessage
 from opentelemetry.sdk.trace import TracerProvider
 from pydantic import BaseModel, SecretStr
 
@@ -19,7 +20,13 @@ from ifap.adapters.knowledge.embeddings import (
 from ifap.adapters.knowledge.in_memory_provider import InMemoryKnowledgeProvider
 from ifap.adapters.llm.openai_compatible import DisabledLLMClient, OpenAICompatibleLLMClient
 from ifap.api.container import build_embeddings, build_knowledge
-from ifap.application.ports import LLMUnavailableError
+from ifap.application.ports import (
+    AssistantTurn,
+    ChatMessage,
+    LLMUnavailableError,
+    ToolCall,
+    ToolSpec,
+)
 from ifap.config.settings import (
     EmbeddingProviderKind,
     EmbeddingSettings,
@@ -237,3 +244,103 @@ def test_console_tracing_installs_sdk_provider(monkeypatch: pytest.MonkeyPatch) 
     telemetry.configure_tracing(ObservabilitySettings(console_traces=True))
     assert len(installed) == 1
     assert isinstance(installed[0], TracerProvider)
+
+
+# ---------------------------------------------------------------- tool calling (converse)
+
+
+class FakeToolChat:
+    """Stands in for ChatOpenAI: records bound tools and returns a canned AIMessage."""
+
+    def __init__(self, response: object) -> None:
+        self.response = response
+        self.bound: list[dict[str, object]] = []
+        self.received: list[object] = []
+
+    def bind_tools(self, tools: list[dict[str, object]]) -> FakeToolChat:
+        self.bound = tools
+        return self
+
+    async def ainvoke(self, messages: list[object]) -> object:
+        self.received = messages
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+
+def _tool_client(monkeypatch: pytest.MonkeyPatch, chat: FakeToolChat) -> OpenAICompatibleLLMClient:
+    client = OpenAICompatibleLLMClient(LLMSettings(provider=LLMProviderKind.OLLAMA))
+    monkeypatch.setattr(client, "_chat", chat)
+    return client
+
+
+SEARCH_SPEC = ToolSpec(name="search", description="Search", input_schema={"type": "object"})
+
+
+async def test_converse_maps_tools_messages_and_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    reply = AIMessage(
+        content="thinking",
+        tool_calls=[{"id": None, "name": "search", "args": {"q": "x"}, "type": "tool_call"}],
+    )
+    chat = FakeToolChat(reply)
+    history = [
+        ChatMessage(role="user", content="goal"),
+        ChatMessage(
+            role="assistant",
+            tool_calls=(ToolCall(id="c1", name="search", arguments={"q": "a"}),),
+        ),
+        ChatMessage(role="tool", content="result", tool_call_id="c1"),
+    ]
+    turn = await _tool_client(monkeypatch, chat).converse(
+        system="sys", messages=history, tools=[SEARCH_SPEC]
+    )
+    assert turn == AssistantTurn(
+        content="thinking", tool_calls=(ToolCall(id="call_0", name="search", arguments={"q": "x"}),)
+    )
+    assert chat.bound[0]["function"] == {
+        "name": "search",
+        "description": "Search",
+        "parameters": {"type": "object"},
+    }
+    kinds = [type(message).__name__ for message in chat.received]
+    assert kinds == ["SystemMessage", "HumanMessage", "AIMessage", "ToolMessage"]
+
+
+async def test_converse_without_tools_and_list_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    chat = FakeToolChat(AIMessage(content=["part"]))
+    turn = await _tool_client(monkeypatch, chat).converse(system="s", messages=[], tools=[])
+    assert turn.tool_calls == ()
+    assert turn.content == "['part']"
+    assert chat.bound == []
+
+
+async def test_converse_rejects_non_ai_output_and_translates_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(LLMUnavailableError, match="Unexpected LLM output: str"):
+        await _tool_client(monkeypatch, FakeToolChat("plain text")).converse(
+            system="s", messages=[], tools=[]
+        )
+    with pytest.raises(LLMUnavailableError, match="ConnectionError"):
+        await _tool_client(monkeypatch, FakeToolChat(ConnectionError("down"))).converse(
+            system="s", messages=[], tools=[SEARCH_SPEC]
+        )
+
+
+async def test_disabled_client_cannot_converse() -> None:
+    with pytest.raises(LLMUnavailableError, match="tool calling"):
+        await DisabledLLMClient().converse(system="s", messages=[], tools=[])
+
+
+async def test_chroma_get_by_id_keeps_requested_order(
+    tmp_path: Path, templates: list[QuestionTemplate]
+) -> None:
+    provider = ChromaKnowledgeProvider(
+        client=create_chroma_client(KnowledgeSettings(chroma_path=tmp_path)),
+        collection="get",
+        embeddings=HashingEmbeddingProvider(32),
+    )
+    await provider.upsert(templates[:10])
+    found = await provider.get(["cs-003", "missing", "cs-001"])
+    assert [t.template_id for t in found] == ["cs-003", "cs-001"]
+    assert await provider.get([]) == []

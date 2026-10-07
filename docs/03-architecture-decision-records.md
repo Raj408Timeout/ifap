@@ -13,7 +13,7 @@ depends only on *ports* (`typing.Protocol`). `api/container.py` is the single co
 **Context.** Need stateful, inspectable multi-agent flows with branching later (human approval,
 loops, parallel fan-out).
 **Decision.** `LangGraphWorkflowOrchestrator` implements `WorkflowOrchestrator`. The graph is
-built *from configuration* (`IFAP_WORKFLOW__PIPELINE`); a conditional edge after each node
+built *from configuration* (`IFAP_WORKFLOW__WORKFLOWS`, see ADR-010); a conditional edge after each node
 stops the run when an agent halts.
 **Consequences.** LangGraph types never leak into agents. The orchestrator could be replaced
 (Temporal, Azure Durable Functions) without touching agents.
@@ -68,3 +68,34 @@ separate response tables.
 ## ADR-009 Configuration-driven, no magic values
 **Decision.** All tunables live in `ifap.config.settings` (pydantic-settings, `IFAP_` prefix,
 `__` nesting). Survey-type keywords and stopwords live in `data/intent_taxonomy.json`.
+
+## ADR-010 Workflows as configured graphs; agents emit signals, not destinations
+**Context.** Autonomy needs loops and agent-influenced routing, but agents that name their
+successors would hard-code the graph and break plug-in extensibility.
+**Decision.** `WorkflowDefinition` (`steps`, `routes`, `max_visits_per_step`) is configuration.
+Agents set `WorkflowState.signal` (e.g. validation's `invalid` / `incomplete`). The LangGraph
+router maps `(step, signal)` to a next step, capped by visit count. Several named workflows are
+compiled at start-up and selected per request. New agent outputs go into
+`WorkflowState.artifacts[name]`, so the core state class does not change.
+**Consequences.** Loops, retries and new topologies are config changes. Visit caps bound every
+loop. The standard workflow behaves exactly as before.
+
+## ADR-011 Tool calling in the LLM port + a guarded tool-loop runtime
+**Decision.** `LLMClient.converse` (with provider-neutral `ChatMessage` / `ToolSpec` /
+`ToolCall` DTOs) is implemented once in the adapter. `agents.runtime.run_tool_loop` is the shared
+agent loop with hard guardrails (`max_tool_calls`, `max_seconds`). Tool failures go back to the
+model as error results so it can self-correct. Tools are declared from Pydantic argument models.
+The first consumer is `autonomous_builder`: grounded (it may only submit retrieved ids), its full
+tool transcript is stored as an artifact, and it falls back to the deterministic selector.
+**Consequences.** Any provider with tool calling works, including Ollama `qwen3:8b`, which was
+verified live. Every autonomous decision can be audited from the trace and artifacts.
+
+## ADR-012 MCP server as a driving adapter
+**Decision.** `ifap.mcp_server` exposes the application services as MCP tools (official `mcp`
+SDK 2.x, `MCPServer`) over stdio (Claude Desktop/Code) and streamable HTTP. It uses the same
+composition root as the REST API and contains no business logic. Domain errors become
+`ToolError`, so the calling model sees actionable messages. Architecture tests forbid inner layers
+from importing it.
+**Consequences.** External agents such as Claude can use IFAP as a toolset, including acting as
+the builder themselves. IFAP *consuming* external MCP tools (client side) is a separate, future
+tool-provider port.
