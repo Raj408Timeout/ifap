@@ -115,3 +115,12 @@ markers = ["integration: touches real infrastructure (Chroma, DB, HTTP app)"]
 [tool.coverage.run]
 source = ["src/ifap"]
 branch = true
+# Only genuinely untestable code is omitted - never add a file here to "fix" coverage.
+omit = [
+    "src/ifap/main.py",  # 2-line ASGI entry point (`app = create_app()`), exercised by `make api`
+]
+
+[tool.coverage.report]
+fail_under = 100        # line + branch; CI and `make check` fail below this
+show_missing = true
+skip_covered = true

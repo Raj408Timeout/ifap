@@ -1,7 +1,7 @@
 BACKEND := backend
 VENV    := $(BACKEND)/.venv/bin
 
-.PHONY: install dataset format lint typecheck test check api web up down
+.PHONY: install dataset format lint typecheck test test-fast check api web up down
 
 install:            ## Create venv and install backend + frontend deps
 	python3.13 -m venv $(BACKEND)/.venv
@@ -21,7 +21,10 @@ typecheck:
 	cd $(BACKEND) && .venv/bin/pyright
 	cd frontend && npm run typecheck
 
-test:
+test:               ## Tests + 100% line/branch coverage gate
+	cd $(BACKEND) && .venv/bin/pytest --cov
+
+test-fast:          ## Tests only, no coverage (quick feedback loop)
 	cd $(BACKEND) && .venv/bin/pytest
 
 check: lint typecheck test   ## Full quality gate (same as CI)

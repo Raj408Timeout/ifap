@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ifap.api.app import create_app
-from ifap.config.settings import LLMProviderKind, LLMSettings, Settings
+from ifap.config.settings import KnowledgeProviderKind, LLMProviderKind, LLMSettings, Settings
 
 pytestmark = pytest.mark.integration
 
@@ -118,3 +118,38 @@ def test_unreachable_ollama_falls_back_to_heuristics(app_settings: Settings) -> 
             "/api/v1/questionnaires/generate", json={"message": "customer delivery survey"}
         ).json()
         assert body["trace"][0]["note"] == "fallback: LLM switched off"
+
+
+def test_list_and_reingest(client: TestClient) -> None:
+    created = client.post("/api/v1/questionnaires/generate", json={"message": "product feedback"})
+    listed = client.get("/api/v1/questionnaires", params={"limit": 5}).json()
+    assert listed[0]["id"] == created.json()["questionnaire"]["id"]
+
+    ingested = client.post("/api/v1/knowledge/ingest").json()
+    assert ingested == {"indexed": 200, "total": 200}  # idempotent upsert
+
+
+def test_broken_pipeline_returns_502(app_settings: Settings) -> None:
+    workflow = app_settings.workflow.model_copy(update={"pipeline": ["intent", "validation"]})
+    with TestClient(create_app(app_settings.model_copy(update={"workflow": workflow}))) as client:
+        response = client.post("/api/v1/questionnaires/generate", json={"message": "a survey"})
+    assert response.status_code == 502
+    assert response.json()["error"] == "AgentExecutionError"
+
+
+def test_startup_can_skip_ingestion_and_warns_on_typos(
+    app_settings: Settings, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("IFAP_LLM_PROVIDER", "ollama")  # single-underscore typo
+    knowledge = app_settings.knowledge.model_copy(
+        update={"provider": KnowledgeProviderKind.IN_MEMORY, "ingest_on_startup": False}
+    )
+    observability = app_settings.observability.model_copy(update={"log_level": "INFO"})
+    settings = app_settings.model_copy(
+        update={"knowledge": knowledge, "observability": observability}
+    )
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/health").json()["knowledge_documents"] == 0
+    output = capsys.readouterr().out
+    assert "config.unrecognised_env_var" in output
+    assert "IFAP_LLM_PROVIDER" in output

@@ -24,7 +24,9 @@ flowchart TB
   `InMemoryEventBus`, which are real port implementations.
 - **Provider conformance.** Every new `KnowledgeProvider` must pass the same behavioural suite as
   the in-memory reference (filtering, ranking, upsert idempotency).
-- **Gate.** CI fails on any black/ruff/pylint/pyright violation or test failure. Coverage is
-  reported via `pytest --cov`.
+- **Gate.** CI fails on any black/ruff/pylint/pyright violation, any test failure, or backend
+  coverage below **100 % (line + branch)** (`fail_under = 100` in `pyproject.toml`). The only
+  omitted file is `main.py`, the two-line ASGI entry point. To change the omit list, open a PR
+  that justifies it. Use `make test-fast` for a quick loop without coverage.
 
 Run everything with `make check`.

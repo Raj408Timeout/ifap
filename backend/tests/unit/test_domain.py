@@ -100,3 +100,9 @@ def test_sample_dataset_shape(templates: list[QuestionTemplate]) -> None:
     }
     assert len({t.template_id for t in templates}) == 200
     assert {t.question.answer_type for t in templates} == set(AnswerType)
+
+
+def test_empty_questionnaire_is_invalid() -> None:
+    report = validate_questionnaire(Questionnaire(title="Survey", survey_type="x"))
+    assert [issue.code for issue in report.issues] == ["EMPTY"]
+    assert not report.is_valid

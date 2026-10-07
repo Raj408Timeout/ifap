@@ -26,8 +26,8 @@ jobs:
         run: pylint src tests
       - name: Type check (pyright strict)
         run: pyright
-      - name: Tests (unit + integration + architecture)
-        run: pytest --cov --cov-report=term-missing
+      - name: Tests (unit + integration + architecture) with 100% coverage gate
+        run: pytest --cov  # fail_under = 100 in pyproject.toml
 
   frontend:
     runs-on: ubuntu-latest

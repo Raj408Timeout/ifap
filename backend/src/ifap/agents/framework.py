@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict
 from ifap.application.ports import KnowledgeProvider, LLMClient
 from ifap.application.workflow import AgentStatus, AgentTrace, WorkflowState
 from ifap.config.settings import WorkflowSettings
-from ifap.domain.errors import AgentExecutionError, AgentNotRegisteredError
+from ifap.domain.errors import AgentNotRegisteredError
 from ifap.domain.intent import IntentTaxonomy
 from ifap.observability.logging import get_logger
 from ifap.observability.telemetry import agent_duration, agent_runs, tracer
@@ -176,9 +176,3 @@ def load_plugins(modules: Iterable[str]) -> None:
         importlib.import_module(module)
     for entry_point in entry_points(group=ENTRY_POINT_GROUP):
         entry_point.load()
-
-
-def ensure_agent_succeeded(state: WorkflowState) -> WorkflowState:
-    if state.halted:
-        raise AgentExecutionError(state.halt_reason or "workflow halted")
-    return state
