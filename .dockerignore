@@ -1,0 +1,7 @@
+**/.venv
+**/node_modules
+**/.next
+**/.chroma
+**/*.db
+**/__pycache__
+.git

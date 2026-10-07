@@ -1,0 +1,30 @@
+Act as a Senior AI Platform Engineer.
+
+Build an agent framework.
+
+Requirements:
+
+1. BaseAgent abstract class
+2. Agent Registry
+3. Agent Factory
+4. Agent Context
+5. Agent Result
+
+Support:
+
+- synchronous execution
+- asynchronous execution
+- retries
+- tracing
+- metrics
+
+Provide patterns for:
+
+- adding new agents
+- removing agents
+- versioning agents
+- testing agents
+
+Use dependency injection throughout.
+
+Show complete implementation.

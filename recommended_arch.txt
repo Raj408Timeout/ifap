@@ -1,0 +1,22 @@
+UI Layer
+   |
+API Gateway
+   |
+Workflow Orchestrator (LangGraph)
+   |
+--------------------------------------------------
+|         |            |            |             |
+Intent   Retrieval   Builder    Validation   Analytics
+Agent     Agent      Agent        Agent        Agent
+--------------------------------------------------
+   |
+Knowledge Abstraction Layer
+   |
+---------------------------------
+|       |        |        |
+Chroma Pinecone AzureAI Weaviate
+---------------------------------
+   |
+Question Template Repository
+   |
+PostgreSQL

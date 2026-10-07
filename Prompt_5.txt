@@ -1,0 +1,37 @@
+Act as an AI Retrieval Architect.
+
+Design the RAG layer for questionnaire generation.
+
+Goals:
+
+- Isolate knowledge completely
+- Allow multiple business domains
+- Enable future growth to millions of questions
+
+Design:
+
+KnowledgeProvider Interface
+
+Implementations:
+
+- Chroma
+- Pinecone
+- Azure AI Search
+- Weaviate
+
+Support:
+
+- metadata filtering
+- hybrid search
+- vector search
+- semantic ranking
+
+Create ingestion pipeline.
+
+Design chunking strategy.
+
+Design document schema.
+
+Design indexing pipeline.
+
+Provide production-ready implementation.

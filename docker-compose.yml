@@ -1,0 +1,56 @@
+name: ifap
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ifap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ifap}
+      POSTGRES_DB: ${POSTGRES_DB:-ifap}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ifap}"]
+      interval: 5s
+      retries: 10
+
+  chroma:
+    image: chromadb/chroma:latest
+    volumes: [chroma-data:/data]
+    ports: ["8001:8000"]
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    environment:
+      IFAP_ENVIRONMENT: docker
+      IFAP_DATABASE__URL: postgresql+asyncpg://${POSTGRES_USER:-ifap}:${POSTGRES_PASSWORD:-ifap}@postgres:5432/${POSTGRES_DB:-ifap}
+      IFAP_KNOWLEDGE__CHROMA_HOST: chroma
+      IFAP_KNOWLEDGE__CHROMA_PORT: 8000
+      IFAP_API__CORS_ORIGINS: '["http://localhost:3000"]'
+      # LLM: disabled | ollama | openai_compatible. For Ollama on the host machine use
+      # IFAP_LLM__PROVIDER=ollama and IFAP_LLM__BASE_URL=http://host.docker.internal:11434/v1
+      IFAP_LLM__PROVIDER: ${IFAP_LLM__PROVIDER:-disabled}
+      IFAP_LLM__ENABLED: ${IFAP_LLM__ENABLED:-true}
+      IFAP_LLM__API_KEY: ${IFAP_LLM__API_KEY:-}
+      IFAP_LLM__BASE_URL: ${IFAP_LLM__BASE_URL:-}
+      IFAP_LLM__MODEL: ${IFAP_LLM__MODEL:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      chroma: { condition: service_started }
+    ports: ["8000:8000"]
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_IFAP_API_URL: http://localhost:8000
+    depends_on:
+      api: { condition: service_healthy }
+    ports: ["3000:3000"]
+
+volumes:
+  postgres-data:
+  chroma-data:

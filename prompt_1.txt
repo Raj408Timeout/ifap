@@ -1,0 +1,306 @@
+Prompt 1
+You are acting as a Principal Architect, Staff Engineer, Platform Engineer, Product Architect, and Lead Python Developer.
+
+Your task is to design and build an enterprise-grade AI platform called:
+
+Intelligent Feedback & Assessment Platform (IFAP)
+
+Business Problem
+----------------
+
+Organizations currently maintain questionnaires manually for different business functions.
+
+Examples:
+
+- Customer Feedback
+- Employee Engagement
+- Compliance Reviews
+- Risk Assessments
+- Healthcare Intake Forms
+- Product Surveys
+- Vendor Assessments
+- Audit Questionnaires
+
+Today these are manually created, maintained and analyzed.
+
+The platform must allow dynamic questionnaire generation through AI using a knowledge base and configurable templates.
+
+The system must start with the Questionnaire Generation use case but be designed as a multi-agent enterprise platform.
+
+High Level Goals
+----------------
+
+1. User interacts through chatbot UI
+2. User describes business need
+3. AI identifies relevant questionnaire templates
+4. AI generates questionnaire
+5. User reviews and modifies questionnaire
+6. Responses are collected
+7. Analytics generated
+8. Architecture supports future AI agents
+
+Future agents may include:
+
+- Analytics Agent
+- Insights Agent
+- Recommendation Agent
+- Trend Detection Agent
+- Sentiment Agent
+- Quality Agent
+- Compliance Agent
+- Risk Agent
+
+The architecture must support plugging in new agents without changing existing code.
+
+Architecture Principles
+------------------------
+
+Follow:
+
+- Hexagonal Architecture
+- Domain Driven Design
+- Clean Architecture
+- SOLID Principles
+- Dependency Injection
+- Event Driven Architecture
+- Plugin Based Agent Framework
+- Async Processing
+- Type Safety
+
+Code Quality Requirements
+-------------------------
+
+Project must pass:
+
+- pyright strict
+- pylint
+- ruff
+- black
+
+Requirements:
+
+- 100% type hints
+- reusable components
+- small functions
+- low cyclomatic complexity
+- testable architecture
+- no hardcoded values
+- configuration driven
+
+Technology Stack
+----------------
+
+Backend:
+- Python 3.13
+- FastAPI
+- Pydantic v2
+- SQLAlchemy
+- PostgreSQL
+
+AI Layer:
+- LangGraph
+- LangChain
+- OpenAI compatible abstraction
+
+Knowledge Layer:
+- Vector Database abstraction
+- Chroma for POC
+- Ability to swap Pinecone, Azure AI Search, Weaviate later
+
+Frontend:
+- React
+- Next.js
+- TypeScript
+- Tailwind
+
+Deployment:
+- Docker
+- Docker Compose
+- GitHub Actions
+
+Observability:
+- OpenTelemetry
+- Structured Logging
+
+Testing:
+- pytest
+- integration tests
+- architecture tests
+
+Design Requirements
+-------------------
+
+Knowledge base must be isolated from orchestration.
+
+Create abstractions:
+
+KnowledgeProvider
+QuestionnaireGenerator
+Agent
+WorkflowOrchestrator
+
+All implementations must be replaceable.
+
+Questionnaire Model
+-------------------
+
+Support:
+
+Question Types:
+- Boolean
+- Multiple Choice
+- Single Choice
+- Rich Text
+- Numeric
+- Date
+- File Upload
+- Skip Logic
+
+Each question should contain:
+
+- id
+- label
+- category
+- description
+- answer_type
+- choices
+- validations
+- dependency_rules
+- business_tags
+
+Multi-Agent Design
+------------------
+
+Design following agents:
+
+1. Intent Agent
+   Understand customer need
+
+2. Template Retrieval Agent
+   Retrieve questionnaire templates via RAG
+
+3. Questionnaire Builder Agent
+   Build questionnaire
+
+4. Validation Agent
+   Validate generated questionnaire
+
+5. Analytics Agent (future)
+
+6. Recommendation Agent (future)
+
+Orchestration Flow
+------------------
+
+User Input
+ ->
+Intent Agent
+ ->
+Template Retrieval Agent
+ ->
+Questionnaire Builder Agent
+ ->
+Validation Agent
+ ->
+Response
+
+Use LangGraph.
+
+RAG Design
+----------
+
+Knowledge Base must contain:
+
+Question Template Documents
+
+Example:
+
+Template:
+Customer Satisfaction
+
+Question:
+How satisfied are you with service?
+
+Type:
+Multiple Choice
+
+Choices:
+Very Satisfied
+Satisfied
+Neutral
+Unsatisfied
+Very Unsatisfied
+
+Metadata:
+Industry
+Business Function
+Survey Type
+Question Tags
+
+Create ingestion pipeline.
+
+Sample Dataset
+--------------
+
+Create a sample dataset of 200 questions across:
+
+- Customer Satisfaction
+- Employee Engagement
+- Healthcare Assessment
+- Product Feedback
+- Compliance Review
+
+Store dataset as JSON.
+
+Documentation Deliverables
+---------------------------
+
+Generate:
+
+1. Vision Document
+2. Product Requirements Document
+3. Architecture Decision Record
+4. Domain Model
+5. Sequence Diagrams
+6. Agent Design Document
+7. RAG Design Document
+8. API Specifications
+9. Deployment Strategy
+10. Security Architecture
+11. Testing Strategy
+12. Coding Standards
+13. Folder Structure
+14. Sprint Plan
+15. Future Roadmap
+
+Implementation Deliverables
+----------------------------
+
+Phase 1
+
+- Full repository structure
+- Domain models
+- API contracts
+- Agent framework
+- Sample dataset
+- Chroma integration
+- Questionnaire generation endpoint
+- React UI
+
+Phase 2
+
+- Feedback collection
+- Analytics service
+- Reporting dashboard
+
+Phase 3
+
+- Multi-agent ecosystem
+- Agent marketplace
+- Enterprise RBAC
+- Multi tenancy
+
+Output all architecture diagrams in Mermaid.
+
+Provide code incrementally and explain design decisions before implementation.
+``

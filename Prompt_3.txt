@@ -1,0 +1,34 @@
+Act as a Staff Python Engineer.
+
+Create the repository structure for the Intelligent Feedback & Assessment Platform.
+
+Requirements:
+
+- FastAPI
+- LangGraph
+- PostgreSQL
+- SQLAlchemy
+- React
+- TypeScript
+
+Folder Structure:
+
+backend/
+frontend/
+infrastructure/
+docs/
+tests/
+
+Generate:
+
+- pyproject.toml
+- pylint configuration
+- pyright configuration
+- ruff configuration
+- Makefile
+- docker-compose.yml
+- Dockerfiles
+
+Include architecture enforcement techniques.
+
+Explain every folder responsibility.

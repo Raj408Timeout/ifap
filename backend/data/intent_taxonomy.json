@@ -1,0 +1,133 @@
+{
+  "default_survey_type": "customer_satisfaction",
+  "stopwords": [
+    "want",
+    "need",
+    "create",
+    "build",
+    "make",
+    "generate",
+    "please",
+    "survey",
+    "questionnaire",
+    "questions",
+    "about",
+    "with",
+    "from",
+    "that",
+    "this",
+    "have",
+    "their",
+    "they",
+    "them",
+    "some",
+    "into",
+    "what",
+    "which",
+    "would",
+    "could",
+    "should"
+  ],
+  "survey_types": [
+    {
+      "survey_type": "customer_satisfaction",
+      "title": "Customer Satisfaction Survey",
+      "business_function": "Customer Experience",
+      "industry": "Retail",
+      "keywords": [
+        "customer",
+        "client",
+        "satisfaction",
+        "csat",
+        "nps",
+        "service",
+        "shopper",
+        "store",
+        "purchase",
+        "delivery",
+        "support",
+        "retail"
+      ]
+    },
+    {
+      "survey_type": "employee_engagement",
+      "title": "Employee Engagement Survey",
+      "business_function": "Human Resources",
+      "industry": "Cross-Industry",
+      "keywords": [
+        "employee",
+        "staff",
+        "engagement",
+        "hr",
+        "workforce",
+        "team",
+        "manager",
+        "culture",
+        "burnout",
+        "wellbeing",
+        "retention",
+        "pulse"
+      ]
+    },
+    {
+      "survey_type": "healthcare_assessment",
+      "title": "Patient Intake Assessment",
+      "business_function": "Clinical Intake",
+      "industry": "Healthcare",
+      "keywords": [
+        "patient",
+        "health",
+        "healthcare",
+        "clinical",
+        "intake",
+        "medical",
+        "hospital",
+        "clinic",
+        "symptom",
+        "medication",
+        "allergy",
+        "doctor"
+      ]
+    },
+    {
+      "survey_type": "product_feedback",
+      "title": "Product Feedback Survey",
+      "business_function": "Product Management",
+      "industry": "Technology",
+      "keywords": [
+        "product",
+        "feature",
+        "app",
+        "software",
+        "saas",
+        "usability",
+        "release",
+        "beta",
+        "roadmap",
+        "user research",
+        "bug",
+        "onboarding"
+      ]
+    },
+    {
+      "survey_type": "compliance_review",
+      "title": "Compliance Review Questionnaire",
+      "business_function": "Compliance & Risk",
+      "industry": "Financial Services",
+      "keywords": [
+        "compliance",
+        "audit",
+        "regulatory",
+        "gdpr",
+        "sox",
+        "risk",
+        "policy",
+        "security",
+        "vendor",
+        "aml",
+        "control",
+        "iso"
+      ]
+    }
+  ]
+}

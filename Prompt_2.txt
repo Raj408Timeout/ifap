@@ -1,0 +1,33 @@
+Act as a Principal Enterprise Architect.
+
+Review the proposed architecture and perform a complete architecture assessment.
+
+Evaluate:
+
+1. Scalability
+2. Extensibility
+3. Maintainability
+4. Security
+5. Cost
+6. Performance
+7. Multi-tenant readiness
+8. Cloud readiness
+9. Agent interoperability
+10. Knowledge base growth
+
+Provide:
+
+- Risks
+- Bottlenecks
+- Tradeoffs
+- Recommended patterns
+- Event driven opportunities
+- Agent communication model
+- Caching strategy
+- Future migration path
+
+Generate C4 Diagrams.
+
+Suggest improvements before coding begins.
+
+Think like a Fortune 100 enterprise architect.
