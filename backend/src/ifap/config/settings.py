@@ -269,7 +269,7 @@ class ApiSettings(BaseModel):
     version: str = "0.1.0"
     prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://localhost:3000"]
-    # e.g. r"https://ifap-[a-z0-9-]+\.vercel\.app" to allow every Vercel preview deployment
+    # e.g. r"https://ifap-[a-z0-9-]+-myscope\.vercel\.app": your Vercel scope's deployments only
     cors_origin_regex: str | None = None
 
 

@@ -19,16 +19,29 @@ gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
 
 log "Artifact Registry repository '${REGISTRY_REPO}' in ${GCP_REGION}"
 gcloud artifacts repositories describe "$REGISTRY_REPO" --location "$GCP_REGION" >/dev/null 2>&1 ||
-  gcloud artifacts repositories create "$REGISTRY_REPO" --repository-format=docker \
+  retry gcloud artifacts repositories create "$REGISTRY_REPO" --repository-format=docker \
     --location "$GCP_REGION" --description "IFAP container images"
 
+# IAM is eventually consistent: a brand-new project, API or service account can take a minute
+# to become usable, so mutating calls are retried instead of failing the whole setup.
+retry() {  # command...
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    if "$@" >/dev/null 2>&1; then return 0; fi
+    echo "   (not ready yet - retrying in $((attempt * 10))s)"
+    sleep $((attempt * 10))
+  done
+  "$@"  # final attempt shows the real error
+}
 ensure_sa() {  # name, display name
-  gcloud iam service-accounts describe "$1@${GCP_PROJECT}.iam.gserviceaccount.com" >/dev/null 2>&1 ||
+  local email="$1@${GCP_PROJECT}.iam.gserviceaccount.com"
+  gcloud iam service-accounts describe "$email" >/dev/null 2>&1 ||
     gcloud iam service-accounts create "$1" --display-name "$2"
+  retry gcloud iam service-accounts describe "$email"
 }
 grant() {  # member, role
-  gcloud projects add-iam-policy-binding "$GCP_PROJECT" --member "$1" --role "$2" \
-    --condition=None --quiet >/dev/null
+  retry gcloud projects add-iam-policy-binding "$GCP_PROJECT" --member "$1" --role "$2" \
+    --condition=None --quiet
 }
 
 log "Runtime service account (what the running containers may do)"
@@ -43,8 +56,8 @@ ensure_sa ifap-deployer "IFAP GitHub Actions deployer"
 for role in roles/run.admin roles/artifactregistry.writer; do
   grant "serviceAccount:${DEPLOYER_SA}" "$role"
 done
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
-  --member "serviceAccount:${DEPLOYER_SA}" --role roles/iam.serviceAccountUser --quiet >/dev/null
+retry gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
+  --member "serviceAccount:${DEPLOYER_SA}" --role roles/iam.serviceAccountUser --quiet
 
 log "Secrets from backend/.env.cloud (values are never printed)"
 read_env() {  # value of KEY in .env.cloud, without surrounding quotes
@@ -73,9 +86,10 @@ gcloud iam workload-identity-pools providers describe "$WIF_PROVIDER" --location
     --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository" \
     --attribute-condition "assertion.repository=='${GITHUB_REPO}'"
 POOL_ID="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WIF_POOL}"
-gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER_SA" --role roles/iam.workloadIdentityUser \
+retry gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER_SA" \
+  --role roles/iam.workloadIdentityUser \
   --member "principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository/${GITHUB_REPO}" \
-  --quiet >/dev/null
+  --quiet
 
 log "Done. Add these as GitHub repository *variables* (Settings > Secrets and variables > Actions > Variables):"
 echo "   GCP_PROJECT=${GCP_PROJECT}"

@@ -125,8 +125,9 @@ Cloud Run UI┘                     └──► Gemini API (OpenAI-compatible; 
    Cloud Build and prints both URLs. After that, every green CI run on `main` redeploys via
    `.github/workflows/deploy.yml` (set the 4 repository variables that `setup.sh` prints).
 5. **Vercel:** import the GitHub repo, set root directory `frontend`, and add the environment
-   variable `NEXT_PUBLIC_IFAP_API_URL=<API URL>`. Vercel URLs matching `https://ifap*.vercel.app`
-   are allowed by the API's CORS policy.
+   variable `NEXT_PUBLIC_IFAP_API_URL=<API URL>`. The API's CORS policy allows
+   only your Vercel scope's URLs (`https://ifap-*-<scope>.vercel.app`, `VERCEL_SCOPE` in
+   `infrastructure/gcp/config.sh`) - not every project whose name starts with "ifap".
 
 Schema changes go through Alembic migrations (`backend/src/ifap/adapters/persistence/migrations`),
 applied automatically on start-up. A drift test fails if a model changes without a migration.

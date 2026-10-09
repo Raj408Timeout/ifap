@@ -18,8 +18,11 @@ WIF_PROVIDER="github-actions"
 
 SECRET_DATABASE_URL="ifap-database-url"
 SECRET_LLM_API_KEY="ifap-llm-api-key"
-# Every Vercel deployment of a project named "ifap" (production and previews)
-VERCEL_ORIGIN_REGEX='https://ifap[a-z0-9-]*\.vercel\.app'
+# Vercel URLs for project "ifap" in *your* Vercel scope ("ifap"): ifap-<hash>-ifap.vercel.app
+# and ifap-git-<branch>-ifap.vercel.app. Anchored on the scope suffix - a bare "ifap*" pattern
+# would also match other people's projects (https://ifap.vercel.app is not ours).
+VERCEL_SCOPE="${VERCEL_SCOPE:-ifap}"
+VERCEL_ORIGIN_REGEX="https://ifap-[a-z0-9-]+-${VERCEL_SCOPE}\.vercel\.app"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CLOUD_ENV_FILE="${ROOT_DIR}/backend/.env.cloud"
