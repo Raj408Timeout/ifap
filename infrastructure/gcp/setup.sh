@@ -51,13 +51,19 @@ for role in roles/secretmanager.secretAccessor roles/cloudtrace.agent \
   grant "serviceAccount:${RUNTIME_SA}" "$role"
 done
 
+log "UI service account (no roles: the Next.js server calls nothing in GCP)"
+ensure_sa ifap-web "IFAP Cloud Run UI"
+
 log "Deployer service account (what GitHub Actions may do)"
 ensure_sa ifap-deployer "IFAP GitHub Actions deployer"
-for role in roles/run.admin roles/artifactregistry.writer; do
+# browser = read project metadata only (deploy.sh needs the project number for service URLs)
+for role in roles/run.admin roles/artifactregistry.writer roles/browser; do
   grant "serviceAccount:${DEPLOYER_SA}" "$role"
 done
-retry gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
-  --member "serviceAccount:${DEPLOYER_SA}" --role roles/iam.serviceAccountUser --quiet
+for sa in "$RUNTIME_SA" "$WEB_SA"; do  # deployer may deploy services that run as these
+  retry gcloud iam service-accounts add-iam-policy-binding "$sa" \
+    --member "serviceAccount:${DEPLOYER_SA}" --role roles/iam.serviceAccountUser --quiet
+done
 
 log "Secrets from backend/.env.cloud (values are never printed)"
 read_env() {  # value of KEY in .env.cloud, without surrounding quotes

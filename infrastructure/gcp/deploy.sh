@@ -36,7 +36,7 @@ IFAP_ENVIRONMENT: cloudrun
 IFAP_KNOWLEDGE__PROVIDER: in_memory
 IFAP_LLM__PROVIDER: gemini
 IFAP_OBSERVABILITY__SERVICE_NAME: ${API_SERVICE}
-IFAP_API__CORS_ORIGINS: '["${WEB_URL}", "http://localhost:3000"]'
+IFAP_API__CORS_ORIGINS: '["${WEB_URL}", "${VERCEL_PRODUCTION_ORIGIN}", "http://localhost:3000"]'
 IFAP_API__CORS_ORIGIN_REGEX: '${VERCEL_ORIGIN_REGEX}'
 YAML
 
@@ -56,7 +56,7 @@ build infrastructure/docker/frontend.Dockerfile "$WEB_IMAGE" "$API_URL"
 
 log "Deploying ${WEB_SERVICE}"
 gcloud run deploy "$WEB_SERVICE" --image "$WEB_IMAGE" --region "$GCP_REGION" \
-  --port 3000 --cpu 1 --memory 512Mi --min-instances 0 --max-instances 2 \
+  --service-account "$WEB_SA" --port 3000 --cpu 1 --memory 512Mi --min-instances 0 --max-instances 2 \
   --allow-unauthenticated --quiet
 
 log "Smoke test"
