@@ -13,7 +13,10 @@ gcloud config set project "$GCP_PROJECT" >/dev/null
 PROJECT_NUMBER="$(gcloud projects describe "$GCP_PROJECT" --format='value(projectNumber)')"
 
 log "Enabling APIs"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+# cloudresourcemanager + iam: service accounts' own calls are billed to this project, so the
+# deployer needs them enabled here (a user's gcloud calls go through gcloud's own project).
+gcloud services enable cloudresourcemanager.googleapis.com iam.googleapis.com \
+  run.googleapis.com artifactregistry.googleapis.com \
   cloudbuild.googleapis.com secretmanager.googleapis.com iamcredentials.googleapis.com \
   sts.googleapis.com cloudtrace.googleapis.com logging.googleapis.com monitoring.googleapis.com
 
