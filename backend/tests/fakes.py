@@ -6,7 +6,13 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from ifap.application.ports import AssistantTurn, ChatMessage, LLMUnavailableError, ToolSpec
+from ifap.application.ports import (
+    AssistantTurn,
+    ChatMessage,
+    LLMUnavailableError,
+    ModelState,
+    ToolSpec,
+)
 
 
 class ScriptedLLM:
@@ -32,6 +38,9 @@ class ScriptedLLM:
         if not isinstance(response, output_type):
             raise LLMUnavailableError(f"no scripted {output_type.__name__}")
         return response
+
+    def model_states(self) -> list[ModelState]:
+        return []
 
     async def converse(
         self, *, system: str, messages: Sequence[ChatMessage], tools: Sequence[ToolSpec]

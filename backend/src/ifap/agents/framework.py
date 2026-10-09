@@ -20,6 +20,7 @@ from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict
 
+from ifap.application.llm_usage import track_model_use
 from ifap.application.ports import KnowledgeProvider, LLMClient
 from ifap.application.workflow import AgentStatus, AgentTrace, WorkflowState
 from ifap.config.settings import WorkflowSettings
@@ -86,7 +87,8 @@ class BaseAgent(Agent):
         started = time.perf_counter()
         with tracer.start_as_current_span(f"agent.{name}") as span:
             span.set_attribute("agent.version", self.descriptor.version)
-            outcome, attempts, error = await self._run_with_retries(state)
+            with track_model_use() as models_used:
+                outcome, attempts, error = await self._run_with_retries(state)
             duration_ms = (time.perf_counter() - started) * 1000
             status = AgentStatus.FAILED if outcome is None else AgentStatus.SUCCEEDED
             span.set_attribute("agent.status", status.value)
@@ -100,6 +102,7 @@ class BaseAgent(Agent):
             duration_ms=round(duration_ms, 2),
             strategy=outcome.strategy if outcome else "",
             note=outcome.note if outcome else str(error),
+            models=tuple(dict.fromkeys(models_used)),
         )
         _log.info("agent.completed", agent=name, status=status.value, duration_ms=duration_ms)
         if outcome is None:

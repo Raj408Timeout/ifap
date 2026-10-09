@@ -97,7 +97,13 @@ def test_agents_catalogue(client: TestClient) -> None:
 
 def test_llm_switch_without_provider(client: TestClient) -> None:
     status = client.get("/api/v1/llm").json()
-    assert status == {"provider": "disabled", "model": None, "configured": False, "enabled": False}
+    assert status == {
+        "provider": "disabled",
+        "model": None,
+        "configured": False,
+        "enabled": False,
+        "models": [],
+    }
     assert client.put("/api/v1/llm", json={"enabled": True}).status_code == 422
 
 

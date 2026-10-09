@@ -38,6 +38,7 @@ class AgentTrace(BaseModel):
     duration_ms: float
     strategy: str = ""
     note: str = ""
+    models: tuple[str, ...] = Field(default=(), description="LLM models that answered this step")
 
 
 class WorkflowState(BaseModel):

@@ -4,6 +4,8 @@ Run:  python scripts/build_sample_dataset.py
 The output is validated against the domain model, so a malformed row fails fast.
 """
 
+# pylint: disable=too-many-lines  # the module is mostly the 200-question data table
+
 from __future__ import annotations
 
 import json

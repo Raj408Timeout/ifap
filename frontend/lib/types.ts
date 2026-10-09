@@ -72,6 +72,8 @@ export interface AgentTrace {
   duration_ms: number;
   strategy: string;
   note: string;
+  /** LLM models that answered this step; empty = no LLM (heuristic or deterministic). */
+  models: string[];
 }
 
 export interface BusinessIntent {
@@ -103,9 +105,18 @@ export interface AgentsInfo {
   llm_enabled: boolean;
 }
 
+export interface ModelState {
+  name: string;
+  available: boolean;
+  reason: string | null;
+  available_in_seconds: number | null;
+}
+
 export interface LLMStatus {
   provider: string;
+  /** Model the next call will use (first available in the chain). */
   model: string | null;
   configured: boolean;
   enabled: boolean;
+  models: ModelState[];
 }

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+from pydantic import SecretStr
 
 from ifap.agents.builtin.builder_agent import BuilderPlan, LabelRewrite, QuestionnaireBuilderAgent
 from ifap.agents.builtin.intent_agent import IntentAgent, IntentExtraction
@@ -14,8 +15,7 @@ from ifap.application.llm_switch import SwitchableLLMClient
 from ifap.application.ports import LLMUnavailableError
 from ifap.application.workflow import GenerationRequest, WorkflowState
 from ifap.config.settings import (
-    OLLAMA_DEFAULT_BASE_URL,
-    OLLAMA_DEFAULT_MODEL,
+    LLM_PRESETS,
     LLMProviderKind,
     LLMSettings,
     unrecognised_env_vars,
@@ -41,13 +41,14 @@ def test_provider_defaults_to_disabled() -> None:
 
 
 def test_api_key_alone_implies_openai_compatible() -> None:
-    assert LLMSettings(api_key="sk-test").kind is LLMProviderKind.OPENAI_COMPATIBLE  # type: ignore[arg-type]
+    settings = LLMSettings(api_key=SecretStr("sk-test"))
+    assert settings.kind is LLMProviderKind.OPENAI_COMPATIBLE
 
 
 def test_ollama_preset_needs_no_key_or_url() -> None:
     settings = LLMSettings(provider=LLMProviderKind.OLLAMA)
-    assert settings.resolved_base_url == OLLAMA_DEFAULT_BASE_URL
-    assert settings.resolved_model == OLLAMA_DEFAULT_MODEL
+    assert settings.resolved_base_url == "http://localhost:11434/v1"
+    assert settings.resolved_model == LLM_PRESETS[LLMProviderKind.OLLAMA].model
     assert settings.resolved_api_key is not None
     assert settings.resolved_reasoning_effort == "none"
     assert settings.resolved_timeout_seconds > LLMSettings().resolved_timeout_seconds
@@ -147,3 +148,11 @@ def test_single_underscore_typo_is_reported() -> None:
         "PATH": "/usr/bin",
     }
     assert unrecognised_env_vars(environ) == ["IFAP_LLM_PROVIDER", "IFAP_LLM__NOPE"]
+
+
+def test_gemini_preset_uses_openai_compatible_endpoint() -> None:
+    settings = LLMSettings(provider=LLMProviderKind.GEMINI)
+    assert settings.resolved_base_url == "https://generativelanguage.googleapis.com/v1beta/openai/"
+    assert settings.resolved_api_key is None  # a real key is required (no placeholder)
+    assert not settings.configured  # missing key -> heuristics, not a start-up crash
+    assert LLMSettings(provider=LLMProviderKind.GEMINI, api_key=SecretStr("k")).configured

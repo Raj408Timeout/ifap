@@ -13,11 +13,13 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
     "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14",
     "asyncpg>=0.30",
     "aiosqlite>=0.20",
     "langgraph>=0.2",
     "langchain-core>=0.3",
     "langchain-openai>=0.2",
+    "openai>=1.40",
     "chromadb>=0.5",
     "structlog>=24.4",
     "opentelemetry-api>=1.28",
@@ -49,7 +51,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-ifap = ["py.typed"]
+ifap = ["py.typed", "adapters/persistence/migrations/script.py.mako"]
 
 # ---------------------------------------------------------------- formatting / lint
 [tool.black]
@@ -79,7 +81,10 @@ max-complexity = 6
 [tool.pylint.main]
 py-version = "3.13"
 load-plugins = []
-ignore-paths = ["^scripts/.*"]
+
+[tool.pylint.typecheck]
+# alembic.context / alembic.op are proxies populated only while a migration runs.
+ignored-modules = ["alembic.context", "alembic.op"]
 
 [tool.pylint.format]
 max-line-length = 100
@@ -101,7 +106,7 @@ disable = [
 
 # ---------------------------------------------------------------- typing
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "scripts"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 venvPath = "."

@@ -20,6 +20,7 @@ from ifap.application.ports import (
     LLMClient,
     LLMStatus,
     LLMUnavailableError,
+    ModelState,
     ToolSpec,
 )
 from ifap.domain.errors import DomainRuleViolationError
@@ -39,12 +40,18 @@ class SwitchableLLMClient:
         return self._enabled
 
     def status(self) -> LLMStatus:
+        models = self._inner.model_states() if self._inner is not None else []
+        active = next((m.name for m in models if m.available), None)
         return LLMStatus(
             provider=self._provider,
-            model=self._model,
+            model=active or self._model,
             configured=self._inner is not None,
             enabled=self._enabled,
+            models=models,
         )
+
+    def model_states(self) -> list[ModelState]:
+        return self._inner.model_states() if self._inner is not None else []
 
     def set_enabled(self, enabled: bool) -> LLMStatus:
         if enabled and self._inner is None:

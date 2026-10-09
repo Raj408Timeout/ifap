@@ -99,3 +99,17 @@ from importing it.
 **Consequences.** External agents such as Claude can use IFAP as a toolset, including acting as
 the builder themselves. IFAP *consuming* external MCP tools (client side) is a separate, future
 tool-provider port.
+
+## ADR-013 Model fallback chain with per-model pacing, and model attribution
+**Context.** Gemini's free tier is limited per model (5 req/min and 20 req/day for
+`gemini-2.5-flash`, verified from 429 responses). Some newer models on the free endpoint
+returned 503 "overloaded" or timed out in a 2026-10-09 probe.
+**Decision.** The OpenAI-compatible adapter keeps one slot per model (primary, then
+fallbacks), each with its own sliding-window limiter and health state. A short 429 waits and
+retries; a long 429 (daily quota), 5xx, timeout or 404 marks that model unavailable (until the
+reset, for a cooldown, or permanently) and the next model is tried. Auth and bad-request errors
+stop the chain. A context variable records the model behind each successful call, and
+`BaseAgent` copies it into `AgentTrace.models`.
+**Consequences.** Daily capacity is the sum of the models' quotas, and the heuristic is used
+only when the whole chain is down. Users always see which model produced each step. Health
+state is per process: the API and the MCP server track it separately but share the quota.

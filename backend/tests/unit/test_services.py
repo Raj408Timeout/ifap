@@ -11,11 +11,8 @@ import pytest
 from ifap.adapters.events.in_memory_bus import InMemoryEventBus
 from ifap.adapters.knowledge.in_memory_provider import InMemoryKnowledgeProvider
 from ifap.adapters.knowledge.json_source import JsonTemplateSource
-from ifap.adapters.persistence.sqlalchemy_repository import (
-    SqlAlchemyQuestionnaireRepository,
-    create_engine,
-    create_schema,
-)
+from ifap.adapters.persistence.schema import create_engine, migrate
+from ifap.adapters.persistence.sqlalchemy_repository import SqlAlchemyQuestionnaireRepository
 from ifap.agents import framework
 from ifap.agents.builtin.builder_agent import QuestionnaireBuilderAgent, select_diverse
 from ifap.agents.builtin.retrieval_agent import TemplateRetrievalAgent
@@ -104,7 +101,7 @@ def _questionnaire(title: str) -> Questionnaire:
 
 async def test_sqlalchemy_repository_round_trip_and_listing(tmp_path: Path) -> None:
     engine = create_engine(DatabaseSettings(url=f"sqlite+aiosqlite:///{tmp_path / 'repo.db'}"))
-    await create_schema(engine)
+    await migrate(engine)
     repository = SqlAlchemyQuestionnaireRepository(engine)
     first, second = _questionnaire("First survey"), _questionnaire("Second survey")
     await repository.save(first)

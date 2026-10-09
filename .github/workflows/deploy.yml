@@ -1,0 +1,39 @@
+name: Deploy to Cloud Run
+
+# Runs only after the CI workflow has passed on main - a red build never deploys.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Skip until infrastructure/gcp/setup.sh has been run and the repo variables exist.
+    if: >-
+      vars.GCP_PROJECT != '' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # OIDC token for Workload Identity Federation (no stored keys)
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      BUILDER: docker
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+      - run: ./infrastructure/gcp/deploy.sh

@@ -1,5 +1,8 @@
 .DS_Store
+# secrets: every .env file except the committed examples
 .env
+.env.*
+!.env.example
 # backend
 backend/.venv/
 backend/.chroma/

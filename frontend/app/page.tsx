@@ -15,12 +15,23 @@ interface Workspace {
   dirty: boolean;
 }
 
+/** Which model answered each LLM-backed step - or why a step ran without one. */
+function modelsUsed(trace: AgentTrace[]): string {
+  const llmSteps = trace.filter((step) => step.models.length > 0);
+  const fallbacks = trace.filter((step) => step.strategy === "heuristic");
+  const used = llmSteps.map((step) => `${step.agent} → ${step.models.join(", ")}`);
+  const skipped = fallbacks.map((step) => `${step.agent} → heuristic`);
+  if (used.length === 0) return "No AI model was used - every step ran on IFAP's heuristics.";
+  return `Models: ${[...used, ...skipped].join(" · ")}`;
+}
+
 function summarise(result: GenerateResponse): string {
   const { intent, questionnaire, source_count: sources } = result;
   const confidence = Math.round(intent.confidence * 100);
   return [
     `I understood this as a ${intent.survey_type.replaceAll("_", " ")} (${confidence}% confidence) and ran the "${result.workflow}" workflow.`,
     `Retrieved ${sources} candidate templates and built "${questionnaire.title}" with ${questionnaire.questions.length} questions.`,
+    modelsUsed(result.trace),
     "Review it on the right - edit, reorder or remove questions, then save and publish.",
   ].join("\n");
 }
@@ -33,6 +44,7 @@ export default function Home() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [busy, setBusy] = useState(false);
   const [workflow, setWorkflow] = useState<string | null>(null);
+  const [llmRefresh, setLlmRefresh] = useState(0); // bump to re-read the model chain status
   const chooseWorkflow = useCallback((name: string) => setWorkflow(name), []);
 
   const say = (message: ChatMessage) => setMessages((current) => [...current, message]);
@@ -54,6 +66,7 @@ export default function Home() {
       const result = await api.generate(text, workflow ?? undefined);
       setWorkspace({ ...result, dirty: false });
       say({ role: "assistant", text: summarise(result) });
+      setLlmRefresh((n) => n + 1); // the active model may have changed (quota, cooldown)
     });
   };
 
@@ -85,7 +98,7 @@ export default function Home() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <WorkflowPicker value={workflow} onChange={chooseWorkflow} />
-          <LlmToggle />
+          <LlmToggle refresh={llmRefresh} />
         </div>
       </header>
       <div className="grid flex-1 gap-4 lg:grid-cols-[380px_1fr]">

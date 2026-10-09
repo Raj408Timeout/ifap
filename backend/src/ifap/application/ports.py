@@ -93,6 +93,10 @@ class LLMClient(Protocol):
         """One model turn that may request tool calls (the basis of autonomous agents)."""
         ...
 
+    def model_states(self) -> list[ModelState]:
+        """The model chain in priority order, with availability (empty if no models)."""
+        ...
+
 
 @runtime_checkable
 class QuestionnaireRepository(Protocol):
@@ -103,11 +107,21 @@ class QuestionnaireRepository(Protocol):
     async def list(self, *, limit: int, offset: int) -> list[Questionnaire]: ...
 
 
+class ModelState(BaseModel):
+    """Health of one model in the provider's fallback chain."""
+
+    name: str
+    available: bool
+    reason: str | None = None
+    available_in_seconds: int | None = None  # when a cooldown or daily quota resets
+
+
 class LLMStatus(BaseModel):
     provider: str
-    model: str | None
+    model: str | None = Field(description="Model the next call will use (first available)")
     configured: bool
     enabled: bool
+    models: list[ModelState] = Field(default_factory=list[ModelState])
 
 
 @runtime_checkable

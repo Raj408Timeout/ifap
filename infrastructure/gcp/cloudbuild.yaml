@@ -1,0 +1,16 @@
+# Builds one image on Cloud Build (no local Docker needed). Used by deploy.sh:
+#   gcloud builds submit --config infrastructure/gcp/cloudbuild.yaml \
+#     --substitutions _DOCKERFILE=...,_IMAGE=...,_API_URL=...
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=${_DOCKERFILE}
+      - --build-arg=NEXT_PUBLIC_IFAP_API_URL=${_API_URL}
+      - --tag=${_IMAGE}
+      - .
+images: ["${_IMAGE}"]
+substitutions:
+  _API_URL: ""
+options:
+  logging: CLOUD_LOGGING_ONLY

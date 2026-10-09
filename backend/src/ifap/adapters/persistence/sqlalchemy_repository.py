@@ -2,7 +2,7 @@
 
 The aggregate is stored as a JSON document plus indexed scalar columns (document-relational
 hybrid): questionnaires are read/written as a whole, while list/filter queries use columns.
-Schema migrations move to Alembic in Phase 2.
+The schema is owned by Alembic migrations (see `schema.py`); this module only maps rows.
 """
 
 from __future__ import annotations
@@ -12,10 +12,9 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import JSON, DateTime, Integer, String, Uuid, select
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from ifap.config.settings import DatabaseSettings
 from ifap.domain.questionnaire import Questionnaire
 
 
@@ -34,15 +33,6 @@ class QuestionnaireRecord(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-
-
-def create_engine(settings: DatabaseSettings) -> AsyncEngine:
-    return create_async_engine(settings.url, echo=settings.echo)
-
-
-async def create_schema(engine: AsyncEngine) -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
 
 
 class SqlAlchemyQuestionnaireRepository:

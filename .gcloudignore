@@ -1,0 +1,17 @@
+# Files NOT uploaded to Cloud Build (keeps uploads small and secrets local)
+.git
+.github
+**/.venv
+**/node_modules
+**/.next
+**/.chroma
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.db
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+docs

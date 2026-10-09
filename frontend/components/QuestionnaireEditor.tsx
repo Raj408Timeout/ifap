@@ -106,6 +106,7 @@ function TracePanel({ trace }: { trace: AgentTrace[] }) {
           <tr>
             <th className="py-1">Agent</th>
             <th>Strategy</th>
+            <th>Model</th>
             <th>Attempts</th>
             <th>Duration</th>
             <th>Note</th>
@@ -118,6 +119,9 @@ function TracePanel({ trace }: { trace: AgentTrace[] }) {
                 {step.status === "succeeded" ? "✓" : "✕"} {step.agent}@{step.version}
               </td>
               <td>{step.strategy}</td>
+              <td className="font-mono text-xs">
+                {step.models.length > 0 ? step.models.join(", ") : <span className="text-slate-400">no LLM</span>}
+              </td>
               <td>{step.attempts}</td>
               <td>{step.duration_ms.toFixed(1)} ms</td>
               <td className="text-slate-500">{step.note}</td>

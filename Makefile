@@ -1,7 +1,7 @@
 BACKEND := backend
 VENV    := $(BACKEND)/.venv/bin
 
-.PHONY: install dataset format lint typecheck test test-fast check api web up down
+.PHONY: install dataset format lint typecheck test test-fast check api api-gemini web up down
 
 install:            ## Create venv and install backend + frontend deps
 	python3.13 -m venv $(BACKEND)/.venv
@@ -15,7 +15,7 @@ format:
 	cd $(BACKEND) && .venv/bin/black src tests scripts && .venv/bin/ruff check --fix src tests scripts
 
 lint:
-	cd $(BACKEND) && .venv/bin/black --check src tests scripts && .venv/bin/ruff check src tests scripts && .venv/bin/pylint src tests
+	cd $(BACKEND) && .venv/bin/black --check src tests scripts && .venv/bin/ruff check src tests scripts && .venv/bin/pylint src tests scripts
 
 typecheck:
 	cd $(BACKEND) && .venv/bin/pyright
@@ -31,6 +31,10 @@ check: lint typecheck test   ## Full quality gate (same as CI)
 
 api:                ## Run the API locally (SQLite + embedded Chroma)
 	cd $(BACKEND) && .venv/bin/uvicorn ifap.main:app --reload --port 8000
+
+api-gemini:         ## Run the API locally on Gemini + Neon (secrets from backend/.env.cloud)
+	cd $(BACKEND) && set -a && . ./.env.cloud && set +a && \
+	  IFAP_LLM__PROVIDER=gemini IFAP_LLM__MODEL= .venv/bin/uvicorn ifap.main:app --reload --port 8000
 
 web:                ## Run the Next.js UI locally
 	cd frontend && npm run dev

@@ -46,6 +46,31 @@ Flip it at runtime (no restart) with the toggle in the UI header, or with
 `curl -X PUT localhost:8000/api/v1/llm -H 'content-type: application/json' -d '{"enabled": false}'`.
 The switch applies to the whole API process and resets to `IFAP_LLM__ENABLED` on restart.
 
+## LLM providers, model chain and rate limits
+| Use | Provider | How |
+|---|---|---|
+| Development | **Ollama** `qwen3:8b`, local, unlimited and free | `make api` (reads `backend/.env`) |
+| Real users / cloud | **Gemini** via its OpenAI-compatible endpoint | deploy (reads Secret Manager), or `make api-gemini` locally |
+
+Gemini's free tier is limited **per model** (verified for `gemini-2.5-flash`: 5 requests/minute
+and 20/day), so IFAP uses a **model chain**: `gemini-3.6-flash` → `gemini-2.5-flash` →
+`gemini-3.1-flash-lite` (override with `IFAP_LLM__MODEL` / `IFAP_LLM__FALLBACK_MODELS`).
+Per model:
+
+| Response | What IFAP does |
+|---|---|
+| over the per-minute pace | queues (≤ 65 s, `IFAP_LLM__RATE_LIMIT_MAX_WAIT_SECONDS`) |
+| 429, short back-off | waits for the provider's `retryDelay`, retries the same model |
+| 429, daily quota (long back-off) | skips the model until its quota resets |
+| 5xx / timeout | skips the model for 60 s (`IFAP_LLM__MODEL_COOLDOWN_SECONDS`) |
+| 404 | skips the model for the life of the process |
+| 401 / 400 | stops: every model would fail the same way |
+
+Only when no model can answer does an agent fall back to its heuristic. **The model is always
+visible:** the header shows the model the next call will use (▾ opens the chain, with when each
+exhausted model comes back), every trace row has a *Model* column, the chat summary lists
+`agent → model`, and MCP results say `intent: llm via gemini-3.6-flash`.
+
 ## Workflows: standard and autonomous
 `IFAP_WORKFLOW__WORKFLOWS` defines named agent graphs. Each workflow lists its `steps`, plus
 `routes` that map an agent's *signal* to a next step, which is how loops are configured.
@@ -83,6 +108,28 @@ then quit and reopen Claude Desktop (Cmd+Q):
 The MCP process reads `backend/.env` (so Ollama works), keeps its knowledge base in memory, logs
 to stderr, and shares the SQLite database with the API: questionnaires created in Claude
 Desktop show up in the API too.
+
+## Deployment (Google Cloud Run + Vercel + Neon)
+```
+Vercel UI ─┐
+           ├─► Cloud Run: ifap-api ──► Neon Postgres      (secrets in Secret Manager)
+Cloud Run UI┘                     └──► Gemini API (OpenAI-compatible; heuristics if absent)
+```
+1. **Secrets:** create `backend/.env.cloud` (git-ignored) with `IFAP_DATABASE__URL=` (Neon
+   connection string, as shown in the Neon console) and `IFAP_LLM__API_KEY=` (Gemini key).
+2. **Preflight:** `cd backend && .venv/bin/python scripts/cloud_preflight.py` checks Neon
+   (region, connectivity, migrations) and Gemini (models, one real call). It never prints secrets.
+3. **One-time GCP setup:** `GCP_PROJECT=<id> GCP_REGION=<region> ./infrastructure/gcp/setup.sh`
+   (APIs, registry, least-privilege service accounts, Secret Manager, keyless GitHub federation).
+4. **Deploy:** `GCP_PROJECT=<id> GCP_REGION=<region> ./infrastructure/gcp/deploy.sh` builds on
+   Cloud Build and prints both URLs. After that, every green CI run on `main` redeploys via
+   `.github/workflows/deploy.yml` (set the 4 repository variables that `setup.sh` prints).
+5. **Vercel:** import the GitHub repo, set root directory `frontend`, and add the environment
+   variable `NEXT_PUBLIC_IFAP_API_URL=<API URL>`. Vercel URLs matching `https://ifap*.vercel.app`
+   are allowed by the API's CORS policy.
+
+Schema changes go through Alembic migrations (`backend/src/ifap/adapters/persistence/migrations`),
+applied automatically on start-up. A drift test fails if a model changes without a migration.
 
 ## Quality gate
 `make check` runs black, ruff, pylint, pyright (strict), and the unit, integration and

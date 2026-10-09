@@ -20,11 +20,8 @@ from ifap.adapters.knowledge.embeddings import (
 from ifap.adapters.knowledge.in_memory_provider import InMemoryKnowledgeProvider
 from ifap.adapters.knowledge.json_source import JsonTemplateSource, load_taxonomy
 from ifap.adapters.llm.openai_compatible import OpenAICompatibleLLMClient
-from ifap.adapters.persistence.sqlalchemy_repository import (
-    SqlAlchemyQuestionnaireRepository,
-    create_engine,
-    create_schema,
-)
+from ifap.adapters.persistence.schema import create_engine, migrate_with_retries
+from ifap.adapters.persistence.sqlalchemy_repository import SqlAlchemyQuestionnaireRepository
 from ifap.agents.framework import (
     DEFAULT_REGISTRY,
     AgentDependencies,
@@ -120,7 +117,7 @@ async def build_container(
     settings: Settings, registry: AgentRegistry = DEFAULT_REGISTRY
 ) -> Container:
     engine = create_engine(settings.database)
-    await create_schema(engine)
+    await migrate_with_retries(engine, settings.database)
     events = InMemoryEventBus()
     repository = SqlAlchemyQuestionnaireRepository(engine)
     llm = build_llm(settings)

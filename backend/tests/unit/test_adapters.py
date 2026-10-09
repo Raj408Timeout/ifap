@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import NoReturn
 
 import pytest
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from opentelemetry.sdk.trace import TracerProvider
 from pydantic import BaseModel, SecretStr
 
@@ -175,32 +176,33 @@ class FakeChat:
         del schema
         return self._runnable
 
+    def bind_tools(self, tools: list[dict[str, object]]) -> NoReturn:
+        raise AssertionError(f"bind_tools not used in this test: {tools}")
 
-def _llm_client(
-    monkeypatch: pytest.MonkeyPatch, runnable: FakeRunnable
-) -> OpenAICompatibleLLMClient:
-    client = OpenAICompatibleLLMClient(LLMSettings(provider=LLMProviderKind.OLLAMA))
-    monkeypatch.setattr(client, "_chat", FakeChat(runnable))
-    return client
+    async def ainvoke(self, messages: object) -> NoReturn:
+        raise AssertionError(f"plain ainvoke not used in this test: {messages}")
 
 
-async def test_llm_adapter_returns_structured_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _llm_client(monkeypatch, FakeRunnable(result=Answer(value="ok")))
+def _llm_client(runnable: FakeRunnable) -> OpenAICompatibleLLMClient:
+    settings = LLMSettings(provider=LLMProviderKind.OLLAMA)
+    return OpenAICompatibleLLMClient(settings, chat_factory=lambda _model: FakeChat(runnable))
+
+
+async def test_llm_adapter_returns_structured_output() -> None:
+    client = _llm_client(FakeRunnable(result=Answer(value="ok")))
     assert client.enabled
     result = await client.generate_structured(system="s", user="u", output_type=Answer)
     assert result == Answer(value="ok")
 
 
-async def test_llm_adapter_rejects_unexpected_output_type(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _llm_client(monkeypatch, FakeRunnable(result={"value": "raw dict"}))
+async def test_llm_adapter_rejects_unexpected_output_type() -> None:
+    client = _llm_client(FakeRunnable(result={"value": "raw dict"}))
     with pytest.raises(LLMUnavailableError, match="Unexpected LLM output: dict"):
         await client.generate_structured(system="s", user="u", output_type=Answer)
 
 
-async def test_llm_adapter_translates_and_truncates_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    client = _llm_client(monkeypatch, FakeRunnable(error=TimeoutError("x" * 500)))
+async def test_llm_adapter_translates_and_truncates_errors() -> None:
+    client = _llm_client(FakeRunnable(error=TimeoutError("x" * 500)))
     with pytest.raises(LLMUnavailableError) as raised:
         await client.generate_structured(system="s", user="u", output_type=Answer)
     assert str(raised.value).startswith("TimeoutError: xxx")
@@ -255,29 +257,31 @@ class FakeToolChat:
     def __init__(self, response: object) -> None:
         self.response = response
         self.bound: list[dict[str, object]] = []
-        self.received: list[object] = []
+        self.received: list[BaseMessage] = []
 
     def bind_tools(self, tools: list[dict[str, object]]) -> FakeToolChat:
         self.bound = tools
         return self
 
-    async def ainvoke(self, messages: list[object]) -> object:
-        self.received = messages
+    async def ainvoke(self, messages: list[BaseMessage]) -> object:
+        self.received = list(messages)
         if isinstance(self.response, Exception):
             raise self.response
         return self.response
 
+    def with_structured_output(self, schema: object) -> NoReturn:
+        raise AssertionError(f"structured output not used in this test: {schema}")
 
-def _tool_client(monkeypatch: pytest.MonkeyPatch, chat: FakeToolChat) -> OpenAICompatibleLLMClient:
-    client = OpenAICompatibleLLMClient(LLMSettings(provider=LLMProviderKind.OLLAMA))
-    monkeypatch.setattr(client, "_chat", chat)
-    return client
+
+def _tool_client(chat: FakeToolChat) -> OpenAICompatibleLLMClient:
+    settings = LLMSettings(provider=LLMProviderKind.OLLAMA)
+    return OpenAICompatibleLLMClient(settings, chat_factory=lambda _model: chat)
 
 
 SEARCH_SPEC = ToolSpec(name="search", description="Search", input_schema={"type": "object"})
 
 
-async def test_converse_maps_tools_messages_and_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_converse_maps_tools_messages_and_tool_calls() -> None:
     reply = AIMessage(
         content="thinking",
         tool_calls=[{"id": None, "name": "search", "args": {"q": "x"}, "type": "tool_call"}],
@@ -291,9 +295,7 @@ async def test_converse_maps_tools_messages_and_tool_calls(monkeypatch: pytest.M
         ),
         ChatMessage(role="tool", content="result", tool_call_id="c1"),
     ]
-    turn = await _tool_client(monkeypatch, chat).converse(
-        system="sys", messages=history, tools=[SEARCH_SPEC]
-    )
+    turn = await _tool_client(chat).converse(system="sys", messages=history, tools=[SEARCH_SPEC])
     assert turn == AssistantTurn(
         content="thinking", tool_calls=(ToolCall(id="call_0", name="search", arguments={"q": "x"}),)
     )
@@ -306,28 +308,25 @@ async def test_converse_maps_tools_messages_and_tool_calls(monkeypatch: pytest.M
     assert kinds == ["SystemMessage", "HumanMessage", "AIMessage", "ToolMessage"]
 
 
-async def test_converse_without_tools_and_list_content(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_converse_without_tools_and_list_content() -> None:
     chat = FakeToolChat(AIMessage(content=["part"]))
-    turn = await _tool_client(monkeypatch, chat).converse(system="s", messages=[], tools=[])
+    turn = await _tool_client(chat).converse(system="s", messages=[], tools=[])
     assert turn.tool_calls == ()
     assert turn.content == "['part']"
     assert chat.bound == []
 
 
-async def test_converse_rejects_non_ai_output_and_translates_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_converse_rejects_non_ai_output_and_translates_errors() -> None:
     with pytest.raises(LLMUnavailableError, match="Unexpected LLM output: str"):
-        await _tool_client(monkeypatch, FakeToolChat("plain text")).converse(
-            system="s", messages=[], tools=[]
-        )
+        await _tool_client(FakeToolChat("plain text")).converse(system="s", messages=[], tools=[])
     with pytest.raises(LLMUnavailableError, match="ConnectionError"):
-        await _tool_client(monkeypatch, FakeToolChat(ConnectionError("down"))).converse(
+        await _tool_client(FakeToolChat(ConnectionError("down"))).converse(
             system="s", messages=[], tools=[SEARCH_SPEC]
         )
 
 
 async def test_disabled_client_cannot_converse() -> None:
+    assert not DisabledLLMClient().model_states()
     with pytest.raises(LLMUnavailableError, match="tool calling"):
         await DisabledLLMClient().converse(system="s", messages=[], tools=[])
 

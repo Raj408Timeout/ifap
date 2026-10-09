@@ -23,7 +23,7 @@ jobs:
       - name: Lint (ruff)
         run: ruff check src tests scripts
       - name: Lint (pylint)
-        run: pylint src tests
+        run: pylint src tests scripts
       - name: Type check (pyright strict)
         run: pyright
       - name: Tests (unit + integration + architecture) with 100% coverage gate

@@ -186,15 +186,18 @@ _NEXT_ACTION = {
 }
 
 
+def _step_line(step: AgentTrace) -> str:
+    """e.g. 'intent: llm via gemini-3.6-flash (1.4 s)' - always names the model that answered."""
+    via = f" via {', '.join(step.models)}" if step.models else ""
+    return f"{step.agent}: {step.strategy or step.status}{via} ({step.duration_ms / 1000:.1f} s)"
+
+
 def _job_view(snapshot: JobSnapshot) -> GenerationJobView:
     return GenerationJobView(
         job_id=snapshot.job_id,
         status=snapshot.status.value,
         elapsed_seconds=snapshot.elapsed_seconds,
-        completed_steps=[
-            f"{step.agent}: {step.strategy or step.status} ({step.duration_ms / 1000:.1f} s)"
-            for step in snapshot.completed_steps
-        ],
+        completed_steps=[_step_line(step) for step in snapshot.completed_steps],
         result=_generation_result(snapshot.outcome) if snapshot.outcome else None,
         error=snapshot.error,
         next_action=_NEXT_ACTION[snapshot.status].format(job_id=snapshot.job_id),
